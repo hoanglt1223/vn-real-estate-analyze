@@ -6,6 +6,7 @@ import { fetchAmenities, fetchInfrastructure } from "./services/overpass";
 import { scrapeMarketPrices } from "./services/scraper";
 import { analyzeProperty } from "./services/ai";
 import { searchLocations } from "./services/provinces";
+import { geocodeLocationCached } from "./services/geocoding";
 import { z } from "zod";
 
 const analyzePropertySchema = z.object({
@@ -168,6 +169,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Location search error:', error);
       res.status(500).json({ 
         error: 'Failed to search locations',
+        message: error.message 
+      });
+    }
+  });
+
+  app.post("/api/locations/geocode", async (req, res) => {
+    try {
+      const { query } = req.body;
+      
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: 'Query parameter is required' });
+      }
+      
+      const result = await geocodeLocationCached(query);
+      
+      if (!result) {
+        return res.status(404).json({ error: 'Location not found' });
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('Geocoding error:', error);
+      res.status(500).json({ 
+        error: 'Failed to geocode location',
         message: error.message 
       });
     }

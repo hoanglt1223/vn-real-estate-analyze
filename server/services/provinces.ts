@@ -34,6 +34,7 @@ export interface SearchResult {
   province?: string;
   district?: string;
   code: number;
+  geocodeQuery: string; // Query string for geocoding
 }
 
 const PROVINCES_API_BASE = 'https://provinces.open-api.vn/api';
@@ -92,7 +93,8 @@ export async function searchLocations(query: string, limit: number = 10): Promis
         name: province.name,
         fullName: province.name,
         type: 'province',
-        code: province.code
+        code: province.code,
+        geocodeQuery: province.name + ', Vietnam'
       });
     }
 
@@ -108,7 +110,8 @@ export async function searchLocations(query: string, limit: number = 10): Promis
             fullName: `${district.name}, ${province.name}`,
             type: 'district',
             province: province.name,
-            code: district.code
+            code: district.code,
+            geocodeQuery: `${district.name}, ${province.name}, Vietnam`
           });
         }
       }
