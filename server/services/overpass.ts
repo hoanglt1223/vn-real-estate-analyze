@@ -32,16 +32,27 @@ const AMENITY_QUERIES: Record<string, AmenityQuery> = {
       amenity: ['cinema', 'theatre', 'restaurant', 'fast_food', 'cafe'],
       leisure: ['fitness_centre', 'sports_centre'],
     }
+  },
+  transport: {
+    category: 'transport',
+    tags: {
+      aeroway: ['aerodrome'],
+      railway: ['station', 'halt'],
+      amenity: ['bus_station'],
+      highway: ['bus_stop'],
+    }
   }
 };
 
 const INFRASTRUCTURE_QUERIES = {
-  roads: '(way["highway"~"motorway|trunk|primary|secondary"]["name"];);',
-  metro: '(node["railway"="station"]["station"="subway"];way["railway"="subway"];);',
-  industrial: '(way["landuse"="industrial"];);',
-  power: '(node["power"="tower"];node["power"="substation"];);',
-  cemetery: '(way["landuse"="cemetery"];);',
-  water: '(way["waterway"~"river|canal|stream"]["name"];);'
+  roads: { query: '(way["highway"~"motorway|trunk|primary|secondary"]["name"];);', type: 'point' },
+  metro: { query: '(node["railway"="station"]["station"="subway"];way["railway"="subway"];);', type: 'point' },
+  bus_routes: { query: '(relation["route"="bus"]["name"];);', type: 'line' },
+  metro_lines: { query: '(relation["route"="subway"]["name"];);', type: 'line' },
+  industrial: { query: '(way["landuse"="industrial"];);', type: 'point' },
+  power: { query: '(node["power"="tower"];node["power"="substation"];);', type: 'point' },
+  cemetery: { query: '(way["landuse"="cemetery"];);', type: 'point' },
+  water: { query: '(way["waterway"~"river|canal|stream"]["name"];);', type: 'point' }
 };
 
 export async function fetchAmenities(
@@ -111,15 +122,16 @@ export async function fetchInfrastructure(
   const infrastructure: any = {};
 
   for (const layer of layers) {
-    const query = INFRASTRUCTURE_QUERIES[layer as keyof typeof INFRASTRUCTURE_QUERIES];
-    if (!query) continue;
+    const queryConfig = INFRASTRUCTURE_QUERIES[layer as keyof typeof INFRASTRUCTURE_QUERIES];
+    if (!queryConfig) continue;
 
     try {
+      const isLineLayer = queryConfig.type === 'line';
       const overpassQuery = `
         [out:json][timeout:25];
-        ${query}
+        ${queryConfig.query}
         (around:${radius},${lat},${lng});
-        out center;
+        ${isLineLayer ? '>;out geom;' : 'out center;'}
       `;
 
       const response = await fetch(OVERPASS_API, {
@@ -131,20 +143,50 @@ export async function fetchInfrastructure(
       if (!response.ok) continue;
 
       const data = await response.json();
-      infrastructure[layer] = (data.elements || []).map((element: any) => ({
-        id: element.id,
-        name: element.tags?.name || element.tags?.['name:vi'] || layer,
-        type: element.type,
-        lat: element.lat || element.center?.lat,
-        lng: element.lon || element.center?.lon,
-        tags: element.tags
-      }));
+      
+      if (isLineLayer) {
+        const relations = data.elements.filter((e: any) => e.type === 'relation');
+        infrastructure[layer] = relations.map((relation: any) => ({
+          id: relation.id,
+          name: relation.tags?.name || relation.tags?.['name:vi'] || layer,
+          type: 'line',
+          geometry: extractLineGeometry(data.elements, relation),
+          tags: relation.tags
+        }));
+      } else {
+        infrastructure[layer] = (data.elements || []).map((element: any) => ({
+          id: element.id,
+          name: element.tags?.name || element.tags?.['name:vi'] || layer,
+          type: element.type,
+          lat: element.lat || element.center?.lat,
+          lng: element.lon || element.center?.lon,
+          tags: element.tags
+        }));
+      }
     } catch (error) {
       console.error(`Error fetching ${layer} infrastructure:`, error);
     }
   }
 
   return infrastructure;
+}
+
+function extractLineGeometry(elements: any[], relation: any): number[][][] {
+  const members = relation.members || [];
+  const wayIds = members.filter((m: any) => m.type === 'way').map((m: any) => m.ref);
+  const ways = elements.filter((e: any) => e.type === 'way' && wayIds.includes(e.id));
+  
+  const lines: number[][][] = [];
+  for (const way of ways) {
+    if (way.geometry && Array.isArray(way.geometry) && way.geometry.length > 0) {
+      const coords = way.geometry.map((node: any) => [node.lon, node.lat]);
+      if (coords.length > 1) {
+        lines.push(coords);
+      }
+    }
+  }
+  
+  return lines;
 }
 
 function buildOverpassQuery(lat: number, lng: number, radius: number, tags: Record<string, string | string[]>): string {
@@ -170,12 +212,21 @@ function buildOverpassQuery(lat: number, lng: number, radius: number, tags: Reco
 }
 
 function getDefaultName(tags: any, category: string): string {
-  const type = tags?.amenity || tags?.shop || tags?.leisure;
+  const type = tags?.amenity || tags?.shop || tags?.leisure || tags?.aeroway || tags?.railway || tags?.highway;
   const categoryNames: Record<string, string> = {
     education: 'Trường học',
     healthcare: 'Cơ sở y tế',
     shopping: 'Cửa hàng',
-    entertainment: 'Giải trí'
+    entertainment: 'Giải trí',
+    transport: 'Điểm giao thông'
   };
+  
+  if (category === 'transport') {
+    if (tags?.aeroway === 'aerodrome') return 'Sân bay';
+    if (tags?.railway === 'station') return 'Nhà ga';
+    if (tags?.amenity === 'bus_station') return 'Bến xe buýt';
+    if (tags?.highway === 'bus_stop') return 'Trạm xe buýt';
+  }
+  
   return categoryNames[category] || 'Địa điểm';
 }

@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { School, Hospital, ShoppingCart, Dumbbell } from 'lucide-react';
+import { School, Hospital, ShoppingCart, Dumbbell, Plane } from 'lucide-react';
 
 interface AmenityCategory {
   id: string;
@@ -43,6 +43,12 @@ const categories: AmenityCategory[] = [
     name: 'Giải trí',
     icon: <Dumbbell className="w-4 h-4" />,
     subcategories: ['Rạp phim', 'Phòng gym', 'Nhà hàng']
+  },
+  {
+    id: 'transport',
+    name: 'Giao thông',
+    icon: <Plane className="w-4 h-4" />,
+    subcategories: ['Sân bay', 'Nhà ga', 'Bến xe buýt', 'Trạm xe buýt']
   }
 ];
 

@@ -37,6 +37,7 @@ const categoryColors: Record<string, string> = {
   healthcare: '#EF4444',
   shopping: '#10B981',
   entertainment: '#F59E0B',
+  transport: '#8B5CF6',
   default: '#6B7280'
 };
 
@@ -45,7 +46,17 @@ const categoryIcons: Record<string, string> = {
   healthcare: '🏥',
   shopping: '🛒',
   entertainment: '🎭',
+  transport: '🚉',
   default: '📍'
+};
+
+const categoryVietnamese: Record<string, string> = {
+  education: 'Giáo dục',
+  healthcare: 'Y tế',
+  shopping: 'Mua sắm',
+  entertainment: 'Giải trí',
+  transport: 'Giao thông',
+  default: 'Khác'
 };
 
 export default function MapView({ 
@@ -303,7 +314,7 @@ export default function MapView({
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
-    const infraLayers = ['infra-roads', 'infra-metro', 'infra-industrial', 'infra-power', 'infra-cemetery', 'infra-water'];
+    const infraLayers = ['infra-roads', 'infra-metro', 'infra-bus_routes', 'infra-metro_lines', 'infra-industrial', 'infra-power', 'infra-cemetery', 'infra-water'];
     
     try {
       infraLayers.forEach(layerId => {
@@ -327,18 +338,44 @@ export default function MapView({
       if (!Array.isArray(data) || data.length === 0) return;
       if (!selectedLayers.includes(layer)) return;
 
-      const features = data.filter((item: any) => item.lat && item.lng).map((item: any) => ({
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [item.lng, item.lat]
-        },
-        properties: {
-          name: item.name,
-          layer
-        }
-      }));
-
+      const isLineLayer = data.length > 0 && data[0].type === 'line';
+      const features: any[] = [];
+      
+      if (isLineLayer) {
+        data.forEach((item: any) => {
+          if (item.geometry && Array.isArray(item.geometry) && item.geometry.length > 0) {
+            item.geometry.forEach((coords: number[][], idx: number) => {
+              if (coords.length > 1) {
+                features.push({
+                  type: 'Feature',
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: coords
+                  },
+                  properties: {
+                    name: item.name,
+                    layer,
+                    segmentId: `${item.id}-${idx}`
+                  }
+                });
+              }
+            });
+          }
+        });
+      } else {
+        features.push(...data.filter((item: any) => item.lat && item.lng).map((item: any) => ({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [item.lng, item.lat]
+          },
+          properties: {
+            name: item.name,
+            layer
+          }
+        })));
+      }
+      
       if (features.length === 0) return;
 
       const sourceId = `infra-${layer}`;
@@ -357,6 +394,8 @@ export default function MapView({
       const layerColors: Record<string, string> = {
         roads: '#F59E0B',
         metro: '#8B5CF6',
+        bus_routes: '#10B981',
+        metro_lines: '#A855F7',
         industrial: '#6B7280',
         power: '#EF4444',
         cemetery: '#374151',
@@ -364,17 +403,30 @@ export default function MapView({
       };
 
       if (!map.current?.getLayer(layerId)) {
-        map.current?.addLayer({
-          id: layerId,
-          type: 'circle',
-          source: sourceId,
-          paint: {
-            'circle-radius': 6,
-            'circle-color': layerColors[layer] || '#6B7280',
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#ffffff'
-          }
-        });
+        if (isLineLayer) {
+          map.current?.addLayer({
+            id: layerId,
+            type: 'line',
+            source: sourceId,
+            paint: {
+              'line-color': layerColors[layer] || '#6B7280',
+              'line-width': 3,
+              'line-opacity': 0.8
+            }
+          });
+        } else {
+          map.current?.addLayer({
+            id: layerId,
+            type: 'circle',
+            source: sourceId,
+            paint: {
+              'circle-radius': 6,
+              'circle-color': layerColors[layer] || '#6B7280',
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#ffffff'
+            }
+          });
+        }
 
         map.current?.on('click', layerId, (e: any) => {
           if (e.features && e.features[0]) {
@@ -428,10 +480,7 @@ export default function MapView({
         <div style="padding:8px;">
           <strong style="font-size:14px;">${amenity.name}</strong>
           <div style="margin-top:4px;font-size:12px;color:#666;">
-            ${amenity.category === 'education' ? 'Giáo dục' : 
-              amenity.category === 'healthcare' ? 'Y tế' :
-              amenity.category === 'shopping' ? 'Mua sắm' :
-              amenity.category === 'entertainment' ? 'Giải trí' : amenity.category}
+            ${categoryVietnamese[amenity.category] || categoryVietnamese.default}
           </div>
           ${amenity.distance ? `<div style="margin-top:4px;font-size:12px;color:#666;">
             Khoảng cách: ${Math.round(amenity.distance)}m
