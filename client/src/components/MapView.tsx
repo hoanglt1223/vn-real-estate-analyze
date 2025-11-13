@@ -11,7 +11,7 @@ interface Amenity {
   name: string;
   category: string;
   lat: number;
-  lon: number;
+  lng: number;
   distance?: number;
 }
 
@@ -178,9 +178,23 @@ export default function MapView({
     mapContainer.current?.appendChild(controlContainer);
 
     const addRadiusLayers = () => {
-      if (!map.current) return;
+      if (!map.current || !map.current.isStyleLoaded()) return;
       
-      if (!map.current.getSource(radiusSourceRef.current)) {
+      try {
+        if (map.current.getLayer('radius-circle-fill')) {
+          map.current.removeLayer('radius-circle-fill');
+        }
+        if (map.current.getLayer('radius-circle-outline')) {
+          map.current.removeLayer('radius-circle-outline');
+        }
+        if (map.current.getSource(radiusSourceRef.current)) {
+          map.current.removeSource(radiusSourceRef.current);
+        }
+      } catch (e) {
+        console.warn('Error removing radius layers:', e);
+      }
+
+      try {
         map.current.addSource(radiusSourceRef.current, {
           type: 'geojson',
           data: {
@@ -188,9 +202,7 @@ export default function MapView({
             features: []
           }
         });
-      }
 
-      if (!map.current.getLayer('radius-circle-fill')) {
         map.current.addLayer({
           id: 'radius-circle-fill',
           type: 'fill',
@@ -200,9 +212,7 @@ export default function MapView({
             'fill-opacity': 0.1
           }
         });
-      }
 
-      if (!map.current.getLayer('radius-circle-outline')) {
         map.current.addLayer({
           id: 'radius-circle-outline',
           type: 'line',
@@ -213,6 +223,8 @@ export default function MapView({
             'line-dasharray': [2, 2]
           }
         });
+      } catch (e) {
+        console.warn('Error adding radius layers:', e);
       }
     };
 
@@ -291,6 +303,103 @@ export default function MapView({
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
+    const infraLayers = ['infra-roads', 'infra-metro', 'infra-industrial', 'infra-power', 'infra-cemetery', 'infra-water'];
+    
+    try {
+      infraLayers.forEach(layerId => {
+        if (map.current?.getLayer(layerId)) {
+          map.current.removeLayer(layerId);
+        }
+      });
+      
+      infraLayers.forEach(sourceId => {
+        if (map.current?.getSource(sourceId)) {
+          map.current.removeSource(sourceId);
+        }
+      });
+    } catch (e) {
+      console.warn('Error removing infrastructure layers:', e);
+    }
+
+    if (!infrastructure || Object.keys(infrastructure).length === 0) return;
+
+    Object.entries(infrastructure || {}).forEach(([layer, data]: [string, any]) => {
+      if (!Array.isArray(data) || data.length === 0) return;
+      if (!selectedLayers.includes(layer)) return;
+
+      const features = data.filter((item: any) => item.lat && item.lng).map((item: any) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [item.lng, item.lat]
+        },
+        properties: {
+          name: item.name,
+          layer
+        }
+      }));
+
+      if (features.length === 0) return;
+
+      const sourceId = `infra-${layer}`;
+      const layerId = `infra-${layer}`;
+
+      if (!map.current?.getSource(sourceId)) {
+        map.current?.addSource(sourceId, {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features
+          }
+        });
+      }
+
+      const layerColors: Record<string, string> = {
+        roads: '#F59E0B',
+        metro: '#8B5CF6',
+        industrial: '#6B7280',
+        power: '#EF4444',
+        cemetery: '#374151',
+        water: '#3B82F6'
+      };
+
+      if (!map.current?.getLayer(layerId)) {
+        map.current?.addLayer({
+          id: layerId,
+          type: 'circle',
+          source: sourceId,
+          paint: {
+            'circle-radius': 6,
+            'circle-color': layerColors[layer] || '#6B7280',
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#ffffff'
+          }
+        });
+
+        map.current?.on('click', layerId, (e: any) => {
+          if (e.features && e.features[0]) {
+            const feature = e.features[0];
+            new mapboxgl.Popup()
+              .setLngLat(e.lngLat)
+              .setHTML(`<strong>${feature.properties.name}</strong>`)
+              .addTo(map.current!);
+          }
+        });
+
+        map.current?.on('mouseenter', layerId, () => {
+          if (map.current) map.current.getCanvas().style.cursor = 'pointer';
+        });
+
+        map.current?.on('mouseleave', layerId, () => {
+          if (map.current) map.current.getCanvas().style.cursor = '';
+        });
+      }
+    });
+  }, [infrastructure, selectedLayers, isLoaded]);
+
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
@@ -331,7 +440,7 @@ export default function MapView({
       `);
 
       const marker = new mapboxgl.Marker(el)
-        .setLngLat([amenity.lon, amenity.lat])
+        .setLngLat([amenity.lng, amenity.lat])
         .setPopup(popup)
         .addTo(map.current!);
 
