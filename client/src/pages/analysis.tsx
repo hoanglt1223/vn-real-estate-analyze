@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'wouter';
 import MapView from '@/components/MapView';
 import PropertyInputPanel from '@/components/PropertyInputPanel';
 import AmenitiesFilter from '@/components/AmenitiesFilter';
@@ -11,7 +12,7 @@ import InfrastructureLayer from '@/components/InfrastructureLayer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Play } from 'lucide-react';
+import { Play, FolderOpen } from 'lucide-react';
 import { analyzeProperty } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { generatePDF } from '@/lib/pdfExport';
@@ -146,15 +147,28 @@ export default function AnalysisPage() {
     <div className="flex flex-col h-screen">
       <div className="border-b bg-background p-2 flex items-center justify-between">
         <h1 className="text-lg font-semibold">Phân Tích Bất Động Sản</h1>
-        <Button
-          onClick={handleExportPDF}
-          disabled={!analysisResults}
-          variant="secondary"
-          size="sm"
-          data-testid="button-export-pdf"
-        >
-          Xuất PDF
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            data-testid="button-management"
+          >
+            <Link href="/management">
+              <FolderOpen className="w-4 h-4 mr-1" />
+              Quản Lý
+            </Link>
+          </Button>
+          <Button
+            onClick={handleExportPDF}
+            disabled={!analysisResults}
+            variant="secondary"
+            size="sm"
+            data-testid="button-export-pdf"
+          >
+            Xuất PDF
+          </Button>
+        </div>
       </div>
       
       <div className="flex-1 flex overflow-hidden">

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Edit, Trash2, MapPin, Calendar, DollarSign } from 'lucide-react';
+import { Edit, Trash2, MapPin, Calendar, DollarSign, ArrowLeft } from 'lucide-react';
 import type { PropertyAnalysis } from '@shared/schema';
 
 export default function ManagementPage() {
@@ -132,7 +133,20 @@ export default function ManagementPage() {
     return (
       <div className="flex flex-col h-screen">
         <div className="border-b bg-background p-4">
-          <h1 className="text-2xl font-bold">Quản Lý Bất Động Sản</h1>
+          <div className="flex items-center gap-3">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              data-testid="button-back"
+            >
+              <Link href="/">
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Quay lại
+              </Link>
+            </Button>
+            <h1 className="text-2xl font-bold">Quản Lý Bất Động Sản</h1>
+          </div>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <p className="text-muted-foreground">Đang tải...</p>
@@ -144,10 +158,25 @@ export default function ManagementPage() {
   return (
     <div className="flex flex-col h-screen">
       <div className="border-b bg-background p-4">
-        <h1 className="text-2xl font-bold">Quản Lý Bất Động Sản</h1>
-        <p className="text-muted-foreground mt-1">
-          Danh sách các khu đất đã phân tích ({properties?.length || 0})
-        </p>
+        <div className="flex items-center gap-3">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            data-testid="button-back"
+          >
+            <Link href="/">
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Quay lại
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Quản Lý Bất Động Sản</h1>
+            <p className="text-muted-foreground text-sm">
+              Danh sách các khu đất đã phân tích ({properties?.length || 0})
+            </p>
+          </div>
+        </div>
       </div>
       
       <div className="flex-1 overflow-hidden">
