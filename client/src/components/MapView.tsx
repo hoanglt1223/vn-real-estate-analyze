@@ -543,10 +543,10 @@ export default function MapView({
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="w-full h-full" data-testid="map-container" />
-      <div className="absolute top-4 left-4 z-10">
+      <div className="absolute top-4 left-4 z-[100]">
         <SearchAutocomplete onSelect={handleSearchSelect} />
       </div>
-      <div className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm max-w-xs">
+      <div className="absolute top-20 right-4 z-[90] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm max-w-xs">
         <p className="font-semibold text-gray-800 mb-1">💡 Hướng dẫn vẽ khu đất:</p>
         <p className="text-gray-600 text-xs">
           1. Click vào icon <span className="inline-block w-6 h-6 align-middle">📐</span> ở góc trên bản đồ<br/>

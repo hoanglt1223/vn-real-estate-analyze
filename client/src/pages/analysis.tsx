@@ -49,8 +49,8 @@ export default function AnalysisPage() {
 
   useEffect(() => {
     if (shouldAutoAnalyze && propertyData.area > 0 && propertyData.coordinates.length > 0) {
-      const timer = setTimeout(() => {
-        handleAnalyze();
+      const timer = setTimeout(async () => {
+        await handleAnalyze(radius, selectedCategories, selectedLayers);
         setShouldAutoAnalyze(false);
       }, 500);
       return () => clearTimeout(timer);
@@ -67,7 +67,7 @@ export default function AnalysisPage() {
     });
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (forceRadius?: number, forceCategories?: string[], forceLayers?: string[]) => {
     if (!propertyData.coordinates || propertyData.coordinates.length === 0) {
       toast({
         title: 'Lỗi',
@@ -77,14 +77,18 @@ export default function AnalysisPage() {
       return;
     }
 
+    const analysisRadius = forceRadius ?? radius;
+    const analysisCategories = forceCategories ?? selectedCategories;
+    const analysisLayers = forceLayers ?? selectedLayers;
+
     setIsAnalyzing(true);
     
     try {
       const results = await analyzeProperty({
         coordinates: propertyData.coordinates,
-        radius,
-        categories: selectedCategories,
-        layers: selectedLayers
+        radius: analysisRadius,
+        categories: analysisCategories,
+        layers: analysisLayers
       });
 
       setAnalysisResults(results);
