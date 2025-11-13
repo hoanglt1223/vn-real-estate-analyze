@@ -68,3 +68,54 @@ export const marketDataCache = pgTable("market_data_cache", {
   data: jsonb("data").notNull().$type<any>(),
   fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
 });
+
+// Property comparisons table
+export const propertyComparisons = pgTable("property_comparisons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  propertyIds: jsonb("property_ids").notNull().$type<string[]>(),
+  comparisonResult: jsonb("comparison_result").notNull().$type<any>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPropertyComparisonSchema = createInsertSchema(propertyComparisons).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPropertyComparison = z.infer<typeof insertPropertyComparisonSchema>;
+export type PropertyComparison = typeof propertyComparisons.$inferSelect;
+
+// Property notes table
+export const propertyNotes = pgTable("property_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  propertyId: varchar("property_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPropertyNoteSchema = createInsertSchema(propertyNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPropertyNote = z.infer<typeof insertPropertyNoteSchema>;
+export type PropertyNote = typeof propertyNotes.$inferSelect;
+
+// Saved searches table
+export const savedSearches = pgTable("saved_searches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  searchCriteria: jsonb("search_criteria").notNull().$type<any>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSavedSearchSchema = createInsertSchema(savedSearches).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSavedSearch = z.infer<typeof insertSavedSearchSchema>;
+export type SavedSearch = typeof savedSearches.$inferSelect;

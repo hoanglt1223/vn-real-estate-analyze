@@ -8,7 +8,8 @@ import { analyzeProperty } from "./services/ai";
 import { searchLocations } from "./services/provinces";
 import { geocodeLocationCached, suggestLocations } from "./services/geocoding";
 import { z } from "zod";
-import type { InsertPropertyAnalysis } from "@shared/schema";
+import type { InsertPropertyAnalysis, InsertPropertyComparison, InsertPropertyNote, InsertSavedSearch } from "@shared/schema";
+import type { SearchCriteria } from "./storage";
 
 const analyzePropertySchema = z.object({
   coordinates: z.array(z.array(z.number())),
@@ -22,6 +23,39 @@ const updateSchema = z.object({
   valuation: z.number().optional().nullable(),
   askingPrice: z.number().optional().nullable(),
   notes: z.string().optional().nullable()
+});
+
+const searchSchema = z.object({
+  query: z.string().optional(),
+  minScore: z.number().optional(),
+  maxScore: z.number().optional(),
+  minPrice: z.number().optional(),
+  maxPrice: z.number().optional(),
+  minArea: z.number().optional(),
+  maxArea: z.number().optional(),
+  propertyType: z.string().optional(),
+  sortBy: z.enum(['date', 'score', 'price', 'area']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+  limit: z.number().optional(),
+  offset: z.number().optional(),
+});
+
+const comparisonSchema = z.object({
+  userId: z.string(),
+  propertyIds: z.array(z.string()),
+  comparisonResult: z.any(),
+});
+
+const noteSchema = z.object({
+  propertyId: z.string(),
+  userId: z.string(),
+  content: z.string(),
+});
+
+const savedSearchSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  searchCriteria: z.any(),
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -336,6 +370,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Advanced search endpoint
+  app.post("/api/properties/search", async (req, res) => {
+    try {
+      const searchCriteria = searchSchema.parse(req.body) as SearchCriteria;
+      const properties = await storage.searchPropertyAnalyses(searchCriteria);
+      res.json(properties);
+    } catch (error: any) {
+      console.error('Search error:', error);
+      res.status(500).json({
+        error: 'Failed to search properties',
+        message: error.message
+      });
+    }
+  });
+
+  // Property comparisons endpoints
+  app.post("/api/comparisons", async (req, res) => {
+    try {
+      const comparisonData = comparisonSchema.parse(req.body) as InsertPropertyComparison;
+      const comparison = await storage.createPropertyComparison(comparisonData);
+      res.json(comparison);
+    } catch (error: any) {
+      console.error('Comparison creation error:', error);
+      res.status(500).json({
+        error: 'Failed to create comparison',
+        message: error.message
+      });
+    }
+  });
+
+  app.get("/api/comparisons/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const comparisons = await storage.getPropertyComparisons(userId);
+      res.json(comparisons);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/comparisons/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deletePropertyComparison(id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Comparison not found' });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Property notes endpoints
+  app.post("/api/notes", async (req, res) => {
+    try {
+      const noteData = noteSchema.parse(req.body) as InsertPropertyNote;
+      const note = await storage.createPropertyNote(noteData);
+      res.json(note);
+    } catch (error: any) {
+      console.error('Note creation error:', error);
+      res.status(500).json({
+        error: 'Failed to create note',
+        message: error.message
+      });
+    }
+  });
+
+  app.get("/api/notes/:propertyId", async (req, res) => {
+    try {
+      const { propertyId } = req.params;
+      const notes = await storage.getPropertyNotes(propertyId);
+      res.json(notes);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/notes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deletePropertyNote(id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Note not found' });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Saved searches endpoints
+  app.post("/api/saved-searches", async (req, res) => {
+    try {
+      const searchData = savedSearchSchema.parse(req.body) as InsertSavedSearch;
+      const savedSearch = await storage.createSavedSearch(searchData);
+      res.json(savedSearch);
+    } catch (error: any) {
+      console.error('Saved search creation error:', error);
+      res.status(500).json({
+        error: 'Failed to create saved search',
+        message: error.message
+      });
+    }
+  });
+
+  app.get("/api/saved-searches/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const savedSearches = await storage.getSavedSearches(userId);
+      res.json(savedSearches);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/saved-searches/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteSavedSearch(id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Saved search not found' });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Import/export endpoints
+  app.post("/api/properties/import", async (req, res) => {
+    try {
+      const { properties } = req.body;
+
+      if (!Array.isArray(properties)) {
+        return res.status(400).json({ error: 'Properties must be an array' });
+      }
+
+      const importedProperties = [];
+
+      for (const propertyData of properties) {
+        try {
+          const validatedData = {
+            coordinates: propertyData.coordinates,
+            area: propertyData.area,
+            orientation: propertyData.orientation,
+            frontageCount: propertyData.frontageCount,
+            center: propertyData.center,
+            amenities: propertyData.amenities || [],
+            infrastructure: propertyData.infrastructure || {},
+            marketData: propertyData.marketData || {},
+            aiAnalysis: propertyData.aiAnalysis || {},
+            risks: propertyData.risks || [],
+            propertyType: propertyData.propertyType || null,
+            valuation: propertyData.valuation || null,
+            askingPrice: propertyData.askingPrice || null,
+            notes: propertyData.notes || null,
+          };
+
+          const imported = await storage.createPropertyAnalysis(validatedData);
+          importedProperties.push(imported);
+        } catch (error) {
+          console.error('Failed to import property:', error);
+          // Continue with other properties even if one fails
+        }
+      }
+
+      res.json({
+        success: true,
+        imported: importedProperties.length,
+        total: properties.length,
+        properties: importedProperties
+      });
+    } catch (error: any) {
+      console.error('Import error:', error);
+      res.status(500).json({
+        error: 'Failed to import properties',
+        message: error.message
+      });
     }
   });
 
