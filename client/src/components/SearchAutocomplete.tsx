@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Loader2, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { apiRequest } from '@/lib/queryClient';
 
 interface VNSearchResult {
   name: string;
@@ -96,14 +95,17 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
 
     try {
       // Geocode the selected location using TrackAsia
-      const geocoded = await apiRequest<{ coordinates: [number, number]; placeName: string }>(
-        '/api/locations/geocode',
-        {
-          method: 'POST',
-          body: JSON.stringify({ query: result.geocodeQuery }),
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+      const response = await fetch('/api/locations/geocode', {
+        method: 'POST',
+        body: JSON.stringify({ query: result.geocodeQuery }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Geocoding failed: ${response.status}`);
+      }
+
+      const geocoded: { coordinates: [number, number]; placeName: string } = await response.json();
 
       // Transform to expected format for map
       const geocodedResult: GeocodedResult = {
