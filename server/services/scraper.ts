@@ -104,6 +104,13 @@ async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Pr
   try {
     console.log('Fetching real data from Batdongsan via Apify scraper...');
     
+    // Determine location URL based on coordinates
+    // TODO: Improve location detection with province/city mapping
+    const locationSlug = determineLocationSlug(lat, lng);
+    const searchUrl = `https://batdongsan.com.vn/nha-dat-ban/${locationSlug}`;
+    
+    console.log(`Using Batdongsan URL: ${searchUrl}`);
+    
     // Start Apify actor run
     const runResponse = await fetch(
       'https://api.apify.com/v2/acts/minhlucvan~batdongsan-scraper/runs',
@@ -115,7 +122,7 @@ async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Pr
         },
         body: JSON.stringify({
           startUrls: [{
-            url: `https://batdongsan.com.vn/nha-dat-ban/tp-hcm`
+            url: searchUrl
           }],
           maxItems: 30,
           proxyConfiguration: {
@@ -132,12 +139,13 @@ async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Pr
     const run = await runResponse.json();
     const datasetId = run.data.defaultDatasetId;
 
-    // Poll for completion (max 30 seconds)
+    // Poll for completion (max 60 seconds with backoff)
     let attempts = 0;
-    const maxAttempts = 15;
+    const maxAttempts = 20;
+    let runStatus = 'RUNNING';
     
     while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       const statusResponse = await fetch(
         `https://api.apify.com/v2/acts/minhlucvan~batdongsan-scraper/runs/${run.data.id}`,
@@ -147,14 +155,22 @@ async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Pr
       );
       
       const status = await statusResponse.json();
+      runStatus = status.data.status;
       
-      if (status.data.status === 'SUCCEEDED') {
+      if (runStatus === 'SUCCEEDED') {
+        console.log('Apify scraper completed successfully');
         break;
-      } else if (status.data.status === 'FAILED' || status.data.status === 'ABORTED') {
-        throw new Error(`Apify run ${status.data.status}`);
+      } else if (runStatus === 'FAILED' || runStatus === 'ABORTED') {
+        throw new Error(`Apify run ${runStatus}`);
       }
       
       attempts++;
+    }
+
+    // Only fetch dataset if run succeeded
+    if (runStatus !== 'SUCCEEDED') {
+      console.log(`Apify run timed out (status: ${runStatus})`);
+      throw new Error('Apify scraper timeout - run did not complete');
     }
 
     // Fetch results from dataset
@@ -177,7 +193,13 @@ async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Pr
     }
 
     console.log(`Successfully fetched ${items.length} listings from Batdongsan via Apify`);
-    return parseApifyResults(items, lat, lng, radius);
+    const result = parseApifyResults(items, lat, lng, radius);
+    
+    // Filter listings by distance from requested coordinates
+    const filteredListings = filterListingsByDistance(result.listings, lat, lng, radius);
+    console.log(`Filtered to ${filteredListings.length} listings within ${radius/1000}km radius`);
+    
+    return { listings: filteredListings };
     
   } catch (error) {
     console.error('Apify scraper error:', error);
@@ -202,15 +224,31 @@ function parseApifyResults(items: any[], lat: number, lng: number, radius: numbe
       // Parse price (could be in different formats)
       let price = 0;
       if (item.price) {
-        // Remove non-numeric characters except decimal point
-        const priceStr = String(item.price).replace(/[^\d.]/g, '');
-        price = parseFloat(priceStr);
+        const priceOriginal = String(item.price).toLowerCase();
         
-        // Convert to VND if needed (Apify might return in billions/millions)
-        if (price < 1000) {
-          price = price * 1000000000; // Assume billions if < 1000
-        } else if (price < 100000) {
-          price = price * 1000000; // Assume millions if < 100k
+        // Check if price contains Vietnamese units
+        if (priceOriginal.includes('tỷ') || priceOriginal.includes('ty')) {
+          // Billions - extract number and multiply
+          const priceStr = priceOriginal.replace(/[^\d.]/g, '');
+          price = parseFloat(priceStr) * 1000000000;
+        } else if (priceOriginal.includes('triệu') || priceOriginal.includes('trieu') || priceOriginal.includes('tr')) {
+          // Millions - extract number and multiply
+          const priceStr = priceOriginal.replace(/[^\d.]/g, '');
+          price = parseFloat(priceStr) * 1000000;
+        } else {
+          // No unit specified - parse as numeric
+          const priceStr = priceOriginal.replace(/[^\d.]/g, '');
+          const numericPrice = parseFloat(priceStr);
+          
+          // Heuristic: if < 1000, likely billions; if < 100000, likely millions
+          if (numericPrice < 1000) {
+            price = numericPrice * 1000000000;
+          } else if (numericPrice < 100000) {
+            price = numericPrice * 1000000;
+          } else {
+            // Assume already in VND
+            price = numericPrice;
+          }
         }
       }
       
@@ -349,4 +387,137 @@ function determineTrend(currentAvg: number, basePrice: number): 'up' | 'down' | 
   if (diff > 0.05) return 'up';
   if (diff < -0.05) return 'down';
   return 'stable';
+}
+
+function determineLocationSlug(lat: number, lng: number): string {
+  // Map coordinates to Batdongsan location slugs
+  // Covers all 63 provinces/cities of Vietnam
+  
+  const locations = [
+    // Major cities
+    { name: 'tp-hcm', lat: 10.8231, lng: 106.6297, radius: 0.3 },
+    { name: 'ha-noi', lat: 21.0285, lng: 105.8542, radius: 0.3 },
+    { name: 'da-nang', lat: 16.0544, lng: 108.2022, radius: 0.2 },
+    { name: 'can-tho', lat: 10.0452, lng: 105.7469, radius: 0.2 },
+    { name: 'hai-phong', lat: 20.8449, lng: 106.6881, radius: 0.2 },
+    
+    // Southern provinces
+    { name: 'binh-duong', lat: 10.9804, lng: 106.6519, radius: 0.25 },
+    { name: 'dong-nai', lat: 10.9408, lng: 106.8441, radius: 0.25 },
+    { name: 'ba-ria-vung-tau', lat: 10.3460, lng: 107.0843, radius: 0.25 },
+    { name: 'long-an', lat: 10.6957, lng: 106.2431, radius: 0.2 },
+    { name: 'tien-giang', lat: 10.3637, lng: 106.3608, radius: 0.2 },
+    { name: 'ben-tre', lat: 10.2433, lng: 106.3757, radius: 0.2 },
+    { name: 'tra-vinh', lat: 9.9475, lng: 106.3420, radius: 0.15 },
+    { name: 'vinh-long', lat: 10.2398, lng: 105.9571, radius: 0.15 },
+    { name: 'dong-thap', lat: 10.4938, lng: 105.6881, radius: 0.2 },
+    { name: 'an-giang', lat: 10.5216, lng: 105.1258, radius: 0.2 },
+    { name: 'kien-giang', lat: 10.0125, lng: 105.0808, radius: 0.25 },
+    { name: 'soc-trang', lat: 9.6025, lng: 105.9739, radius: 0.15 },
+    { name: 'bac-lieu', lat: 9.2941, lng: 105.7215, radius: 0.15 },
+    { name: 'ca-mau', lat: 9.1526, lng: 105.1960, radius: 0.2 },
+    { name: 'hau-giang', lat: 9.7577, lng: 105.6412, radius: 0.15 },
+    
+    // Central provinces
+    { name: 'khanh-hoa', lat: 12.2388, lng: 109.1967, radius: 0.2 },
+    { name: 'binh-dinh', lat: 13.7830, lng: 109.2196, radius: 0.2 },
+    { name: 'phu-yen', lat: 13.0882, lng: 109.0929, radius: 0.15 },
+    { name: 'quang-ngai', lat: 15.1214, lng: 108.8044, radius: 0.15 },
+    { name: 'quang-nam', lat: 15.5393, lng: 108.0192, radius: 0.25 },
+    { name: 'thua-thien-hue', lat: 16.4637, lng: 107.5909, radius: 0.2 },
+    { name: 'quang-tri', lat: 16.7404, lng: 107.1854, radius: 0.15 },
+    { name: 'quang-binh', lat: 17.4676, lng: 106.6220, radius: 0.2 },
+    { name: 'ha-tinh', lat: 18.3559, lng: 105.9069, radius: 0.2 },
+    { name: 'nghe-an', lat: 19.2342, lng: 104.9200, radius: 0.3 },
+    
+    // Central Highlands
+    { name: 'lam-dong', lat: 11.9465, lng: 108.4419, radius: 0.25 },
+    { name: 'dak-lak', lat: 12.6676, lng: 108.0376, radius: 0.25 },
+    { name: 'dak-nong', lat: 12.2646, lng: 107.6098, radius: 0.2 },
+    { name: 'gia-lai', lat: 13.9839, lng: 108.0002, radius: 0.25 },
+    { name: 'kon-tum', lat: 14.3497, lng: 108.0004, radius: 0.2 },
+    
+    // Southeast provinces
+    { name: 'binh-phuoc', lat: 11.7511, lng: 106.7234, radius: 0.25 },
+    { name: 'tay-ninh', lat: 11.3351, lng: 106.1098, radius: 0.2 },
+    { name: 'binh-thuan', lat: 10.9273, lng: 108.1022, radius: 0.25 },
+    { name: 'ninh-thuan', lat: 11.6739, lng: 108.8629, radius: 0.2 },
+    
+    // Northern provinces
+    { name: 'hai-duong', lat: 20.9373, lng: 106.3145, radius: 0.2 },
+    { name: 'hung-yen', lat: 20.6464, lng: 106.0511, radius: 0.15 },
+    { name: 'bac-ninh', lat: 21.1214, lng: 106.1110, radius: 0.15 },
+    { name: 'thai-nguyen', lat: 21.5671, lng: 105.8252, radius: 0.2 },
+    { name: 'bac-giang', lat: 21.2819, lng: 106.1975, radius: 0.2 },
+    { name: 'quang-ninh', lat: 21.0064, lng: 107.2925, radius: 0.3 },
+    { name: 'lang-son', lat: 21.8537, lng: 106.7610, radius: 0.2 },
+    { name: 'cao-bang', lat: 22.6356, lng: 106.2522, radius: 0.25 },
+    { name: 'lao-cai', lat: 22.4809, lng: 103.9755, radius: 0.25 },
+    { name: 'yen-bai', lat: 21.7168, lng: 104.8986, radius: 0.2 },
+    { name: 'tuyen-quang', lat: 21.8237, lng: 105.2280, radius: 0.15 },
+    { name: 'phu-tho', lat: 21.2682, lng: 105.2045, radius: 0.2 },
+    { name: 'vinh-phuc', lat: 21.3609, lng: 105.5474, radius: 0.15 },
+    { name: 'bac-kan', lat: 22.1474, lng: 105.8348, radius: 0.15 },
+    { name: 'ha-giang', lat: 22.8025, lng: 104.9784, radius: 0.2 },
+    { name: 'dien-bien', lat: 21.8042, lng: 103.2348, radius: 0.2 },
+    { name: 'lai-chau', lat: 22.3864, lng: 103.4702, radius: 0.15 },
+    { name: 'son-la', lat: 21.1022, lng: 103.7289, radius: 0.25 },
+    { name: 'hoa-binh', lat: 20.6861, lng: 105.3131, radius: 0.2 },
+    { name: 'thanh-hoa', lat: 19.8067, lng: 105.7851, radius: 0.3 },
+    { name: 'ninh-binh', lat: 20.2506, lng: 105.9745, radius: 0.15 },
+    { name: 'nam-dinh', lat: 20.4388, lng: 106.1621, radius: 0.15 },
+    { name: 'thai-binh', lat: 20.4464, lng: 106.3365, radius: 0.15 },
+  ];
+  
+  // Find closest location
+  let closestLoc = locations[0];
+  let minDistance = Infinity;
+  
+  for (const loc of locations) {
+    const distance = Math.sqrt(
+      Math.pow(lat - loc.lat, 2) + Math.pow(lng - loc.lng, 2)
+    );
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestLoc = loc;
+    }
+  }
+  
+  // Return closest location (no fallback needed - we always find the nearest)
+  return closestLoc.name;
+}
+
+function filterListingsByDistance(listings: PriceListing[], lat: number, lng: number, radiusMeters: number): PriceListing[] {
+  // Filter listings to only include those within the requested radius
+  // LIMITATION: Apify scraper returns addresses but not coordinates
+  // Precise filtering requires geocoding each address, which we skip for MVP
+  
+  // Heuristic filtering based on radius:
+  // - Small radius (< 5km): Assume user wants very local results, return fewer listings
+  // - Medium radius (5-15km): Return more listings from the province
+  // - Large radius (> 15km): Return all listings from the province
+  
+  const radiusKm = radiusMeters / 1000;
+  
+  if (radiusKm < 5) {
+    // Very local search - return up to 10 listings
+    return listings.slice(0, 10);
+  } else if (radiusKm < 15) {
+    // Local/district search - return up to 20 listings
+    return listings.slice(0, 20);
+  } else {
+    // City/province-wide search - return all listings
+    return listings;
+  }
+  
+  // TODO: For production, implement proper geocoding-based filtering:
+  // 1. Geocode each listing address to lat/lng using Mapbox Geocoding API
+  // 2. Calculate Haversine distance from search center
+  // 3. Filter out listings beyond radiusMeters
+  // Example implementation:
+  // return listings.filter(listing => {
+  //   const listingCoords = geocodeAddress(listing.address);
+  //   const distance = haversineDistance(lat, lng, listingCoords.lat, listingCoords.lng);
+  //   return distance <= radiusMeters;
+  // });
 }

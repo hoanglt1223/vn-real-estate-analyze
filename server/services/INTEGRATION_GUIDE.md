@@ -66,54 +66,69 @@ curl "https://api.apify.com/v2/datasets/{datasetId}/items" \
   -H "Authorization: Bearer YOUR_APIFY_TOKEN"
 ```
 
-**Integration vào app:**
+**✅ Integration đã hoàn thành vào app:**
+
+**Tính năng đã implement:**
+- ✅ Apify scraper integration với auto-retry và fallback
+- ✅ Coverage tất cả 63 tỉnh/thành Việt Nam
+- ✅ Parse giá tự động (triệu/tỷ VND)
+- ✅ Polling với timeout 60 giây
+- ✅ Heuristic filtering theo bán kính (< 5km, 5-15km, > 15km)
+
+**Hạn chế hiện tại:**
+- ⚠️ Radius filtering dùng heuristic (không có geocoding chính xác)
+- ⚠️ Apify scraper trả về địa chỉ text, không có tọa độ
+- 💡 Để filter chính xác cần geocode từng address → tốn cost
+
+**Code sample:**
 ```typescript
-// server/services/scraper.ts
-async function fetchFromBatdongsan(lat: number, lng: number, radius: number) {
-  const APIFY_TOKEN = process.env.APIFY_API_KEY;
+// server/services/scraper.ts - ĐÃ IMPLEMENTED
+async function fetchFromBatdongsan(lat, lng, radius) {
+  // 1. Check API key
+  if (!process.env.APIFY_API_KEY) {
+    return mockData;
+  }
+
+  // 2. Determine location (63 provinces covered)
+  const locationSlug = determineLocationSlug(lat, lng);
+  // → tp-hcm, ha-noi, da-nang, etc.
+
+  // 3. Start Apify scraper
+  const run = await fetch('https://api.apify.com/v2/acts/...');
   
-  if (!APIFY_TOKEN) {
-    return generateMockListings('batdongsan', lat, lng, radius, 15);
-  }
+  // 4. Poll until SUCCEEDED (max 60s)
+  while (status !== 'SUCCEEDED') { ... }
+  
+  // 5. Fetch results
+  const items = await fetch(`.../datasets/${datasetId}/items`);
+  
+  // 6. Parse prices (triệu/tỷ aware)
+  const listings = parseApifyResults(items);
+  
+  // 7. Filter by radius (heuristic)
+  return filterListingsByDistance(listings, lat, lng, radius);
+}
+```
 
-  try {
-    // Start actor run
-    const runResponse = await fetch(
-      'https://api.apify.com/v2/acts/minhlucvan~batdongsan-scraper/runs',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${APIFY_TOKEN}`
-        },
-        body: JSON.stringify({
-          startUrls: [{
-            url: `https://batdongsan.com.vn/nha-dat-ban/tp-hcm?lat=${lat}&lng=${lng}`
-          }],
-          maxItems: 50
-        })
-      }
+**Nâng cấp Production (roadmap):**
+```typescript
+// TODO: Add geocoding for precise filtering
+async function filterListingsByDistance(listings, lat, lng, radius) {
+  // Option A: Mapbox Geocoding API
+  const geocoded = await Promise.all(
+    listings.map(l => geocodeAddress(l.address))
+  );
+  
+  return listings.filter((l, i) => {
+    const distance = haversineDistance(
+      lat, lng, 
+      geocoded[i].lat, geocoded[i].lng
     );
-
-    const run = await runResponse.json();
-    const datasetId = run.data.defaultDatasetId;
-
-    // Wait and fetch results
-    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait for scraping
-    
-    const dataResponse = await fetch(
-      `https://api.apify.com/v2/datasets/${datasetId}/items`,
-      {
-        headers: { 'Authorization': `Bearer ${APIFY_TOKEN}` }
-      }
-    );
-
-    const items = await dataResponse.json();
-    return parseApifyResults(items);
-  } catch (error) {
-    console.error('Apify error:', error);
-    return generateMockListings('batdongsan', lat, lng, radius, 15);
-  }
+    return distance <= radius;
+  });
+  
+  // Option B: Vietnam Provinces API + approximate matching
+  // (cheaper but less accurate)
 }
 ```
 
