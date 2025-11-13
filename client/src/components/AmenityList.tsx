@@ -9,6 +9,14 @@ interface Amenity {
   category: string;
   distance: number;
   walkTime: number;
+  type?: string;
+  subtype?: string;
+  tags?: {
+    amenity?: string;
+    school_type?: string;
+    isced_level?: string;
+    operator_type?: string;
+  };
 }
 
 interface AmenityListProps {
@@ -29,6 +37,47 @@ const categoryNames: Record<string, string> = {
   shopping: 'Mua sắm',
   entertainment: 'Giải trí'
 };
+
+function getEducationTypeLabel(amenity: Amenity): string {
+  if (amenity.category !== 'education') return '';
+  
+  const tags = amenity.tags;
+  if (!tags) return '';
+  
+  if (tags.amenity === 'university') {
+    return 'Đại học / Cao đẳng';
+  }
+  
+  if (tags.amenity === 'college') {
+    return 'Cao đẳng / Trung cấp';
+  }
+  
+  if (tags.amenity === 'school') {
+    if (tags.school_type === 'primary' || tags.isced_level === '1') {
+      return 'Trường Tiểu học';
+    }
+    if (tags.school_type === 'secondary' || tags.isced_level === '2') {
+      return 'Trường Trung học cơ sở (THCS)';
+    }
+    if (tags.school_type === 'high' || tags.isced_level === '3') {
+      return 'Trường Trung học phổ thông (THPT)';
+    }
+    if (tags.school_type === 'kindergarten' || tags.isced_level === '0') {
+      return 'Trường Mầm non';
+    }
+    
+    if (tags.operator_type === 'government' || tags.operator_type === 'public') {
+      return 'Trường Công lập';
+    }
+    if (tags.operator_type === 'private') {
+      return 'Trường Tư thục';
+    }
+    
+    return 'Trường học';
+  }
+  
+  return 'Cơ sở giáo dục';
+}
 
 export default function AmenityList({ amenities = [], onAmenityClick }: AmenityListProps) {
   const groupedAmenities = amenities.reduce((acc, amenity) => {
@@ -62,31 +111,40 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
                   </Badge>
                 </div>
                 <div className="space-y-2">
-                  {items.map((amenity) => (
-                    <div
-                      key={amenity.id}
-                      className="flex items-start gap-3 p-3 rounded-md hover-elevate active-elevate-2 cursor-pointer border"
-                      onClick={() => onAmenityClick?.(amenity)}
-                      data-testid={`amenity-${amenity.id}`}
-                    >
-                      <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {amenity.name}
-                        </p>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-muted-foreground">
-                            {amenity.distance >= 1000
-                              ? `${(amenity.distance / 1000).toFixed(1)} km`
-                              : `${amenity.distance} m`}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            • {amenity.walkTime} phút đi bộ
-                          </span>
+                  {items.map((amenity) => {
+                    const educationType = amenity.category === 'education' ? getEducationTypeLabel(amenity) : '';
+                    
+                    return (
+                      <div
+                        key={amenity.id}
+                        className="flex items-start gap-3 p-3 rounded-md hover-elevate active-elevate-2 cursor-pointer border"
+                        onClick={() => onAmenityClick?.(amenity)}
+                        data-testid={`amenity-${amenity.id}`}
+                      >
+                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {amenity.name}
+                          </p>
+                          {educationType && (
+                            <p className="text-xs text-primary font-medium mt-0.5">
+                              {educationType}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="text-xs text-muted-foreground">
+                              {amenity.distance >= 1000
+                                ? `${(amenity.distance / 1000).toFixed(1)} km`
+                                : `${amenity.distance} m`}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              • {amenity.walkTime} phút đi bộ
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}

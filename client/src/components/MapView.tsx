@@ -567,7 +567,11 @@ export default function MapView({
       }
       el.textContent = icon;
 
-      const educationType = amenity.category === 'education' ? getEducationTypeLabel(amenity) : '';
+      let educationType = '';
+      if (amenity.category === 'education') {
+        educationType = getEducationTypeLabel(amenity);
+        console.log('Education amenity:', amenity.name, 'Tags:', amenity.tags, 'Type:', educationType);
+      }
       
       const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
         <div style="padding:8px;">
