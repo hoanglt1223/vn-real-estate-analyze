@@ -246,6 +246,7 @@ export default function AnalysisPage() {
                   <TabsContent value="analysis" className="p-4 space-y-4">
                     <AIAnalysisCard
                       scores={analysisResults.aiAnalysis.scores}
+                      scoreExplanations={analysisResults.aiAnalysis.scoreExplanations}
                       recommendation={analysisResults.aiAnalysis.recommendation}
                       estimatedPrice={analysisResults.aiAnalysis.estimatedPrice}
                       summary={analysisResults.aiAnalysis.summary}
@@ -270,6 +271,7 @@ export default function AnalysisPage() {
               <div className="p-6 space-y-6">
                 <AIAnalysisCard
                   scores={analysisResults.aiAnalysis.scores}
+                  scoreExplanations={analysisResults.aiAnalysis.scoreExplanations}
                   recommendation={analysisResults.aiAnalysis.recommendation}
                   estimatedPrice={analysisResults.aiAnalysis.estimatedPrice}
                   summary={analysisResults.aiAnalysis.summary}

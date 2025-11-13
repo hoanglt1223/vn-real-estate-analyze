@@ -209,9 +209,9 @@ export default function MapView({
     });
 
     const controlContainer = document.createElement('div');
-    controlContainer.className = 'mapboxgl-ctrl-bottom-right';
+    controlContainer.className = 'mapboxgl-ctrl-top-right';
     controlContainer.style.position = 'absolute';
-    controlContainer.style.bottom = '120px';
+    controlContainer.style.top = '85px';
     controlContainer.style.right = '10px';
     controlContainer.appendChild(layerControl);
     mapContainer.current?.appendChild(controlContainer);

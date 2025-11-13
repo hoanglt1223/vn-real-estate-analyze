@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Brain, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Brain, CheckCircle2, XCircle, AlertCircle, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 
 interface AIScore {
   overall: number;
@@ -14,6 +16,14 @@ interface AIScore {
 
 interface AIAnalysisCardProps {
   scores?: AIScore;
+  scoreExplanations?: {
+    overall: string;
+    amenities: string;
+    planning: string;
+    residential: string;
+    investment: string;
+    risk: string;
+  };
   recommendation?: 'buy' | 'consider' | 'avoid';
   estimatedPrice?: number;
   summary?: string;
@@ -21,10 +31,12 @@ interface AIAnalysisCardProps {
 
 export default function AIAnalysisCard({
   scores,
+  scoreExplanations,
   recommendation,
   estimatedPrice,
   summary
 }: AIAnalysisCardProps) {
+  const [isExplanationsOpen, setIsExplanationsOpen] = useState(false);
   if (!scores) return null;
 
   const getScoreColor = (score: number) => {
@@ -115,11 +127,11 @@ export default function AIAnalysisCard({
 
         <div className="space-y-4">
           {[
-            { label: 'Tiện ích', value: scores.amenities },
-            { label: 'Quy hoạch & Hạ tầng', value: scores.planning },
-            { label: 'An cư', value: scores.residential },
-            { label: 'Đầu tư', value: scores.investment },
-            { label: 'Rủi ro (thấp hơn = tốt)', value: 100 - scores.risk }
+            { label: 'Tiện ích', value: scores.amenities, key: 'amenities' },
+            { label: 'Quy hoạch & Hạ tầng', value: scores.planning, key: 'planning' },
+            { label: 'An cư', value: scores.residential, key: 'residential' },
+            { label: 'Đầu tư', value: scores.investment, key: 'investment' },
+            { label: 'Rủi ro (thấp hơn = tốt)', value: 100 - scores.risk, key: 'risk' }
           ].map((item, index) => (
             <div key={index} className="space-y-2">
               <div className="flex items-center justify-between text-sm">
@@ -132,6 +144,41 @@ export default function AIAnalysisCard({
             </div>
           ))}
         </div>
+
+        {scoreExplanations && (
+          <Collapsible open={isExplanationsOpen} onOpenChange={setIsExplanationsOpen}>
+            <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full">
+              <ChevronDown className={`w-4 h-4 transition-transform ${isExplanationsOpen ? 'rotate-180' : ''}`} />
+              <span>Cách tính điểm chi tiết</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 space-y-3">
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-xs font-semibold mb-1">Điểm Tổng Quan:</p>
+                <p className="text-xs text-muted-foreground">{scoreExplanations.overall}</p>
+              </div>
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-xs font-semibold mb-1">Tiện Ích:</p>
+                <p className="text-xs text-muted-foreground">{scoreExplanations.amenities}</p>
+              </div>
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-xs font-semibold mb-1">Quy Hoạch:</p>
+                <p className="text-xs text-muted-foreground">{scoreExplanations.planning}</p>
+              </div>
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-xs font-semibold mb-1">An Cư:</p>
+                <p className="text-xs text-muted-foreground">{scoreExplanations.residential}</p>
+              </div>
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-xs font-semibold mb-1">Đầu Tư:</p>
+                <p className="text-xs text-muted-foreground">{scoreExplanations.investment}</p>
+              </div>
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-xs font-semibold mb-1">Rủi Ro:</p>
+                <p className="text-xs text-muted-foreground">{scoreExplanations.risk}</p>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         {estimatedPrice && (
           <div className="p-4 bg-primary/10 rounded-lg">

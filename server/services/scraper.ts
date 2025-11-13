@@ -6,6 +6,10 @@ export interface MarketPriceData {
   listingCount: number;
   trend?: 'up' | 'down' | 'stable';
   pricePerSqm: number;
+  sources: Array<{
+    name: string;
+    type: string;
+  }>;
 }
 
 export async function scrapeMarketPrices(
@@ -44,7 +48,11 @@ export async function scrapeMarketPrices(
     median,
     listingCount,
     trend,
-    pricePerSqm: Math.round(avg / 100)
+    pricePerSqm: Math.round(avg / 100),
+    sources: [
+      { name: 'Dữ liệu ước tính dựa trên khu vực', type: 'estimated' },
+      { name: 'Phân tích thị trường tổng hợp', type: 'aggregated' }
+    ]
   };
 }
 

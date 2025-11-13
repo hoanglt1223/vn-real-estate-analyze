@@ -11,7 +11,7 @@ const AMENITY_QUERIES: Record<string, AmenityQuery> = {
   education: {
     category: 'education',
     tags: {
-      amenity: ['kindergarten', 'school', 'college', 'university'],
+      amenity: ['school', 'college', 'university'],
     }
   },
   healthcare: {
@@ -23,23 +23,22 @@ const AMENITY_QUERIES: Record<string, AmenityQuery> = {
   shopping: {
     category: 'shopping',
     tags: {
-      shop: ['supermarket', 'convenience', 'mall'],
+      shop: ['supermarket', 'mall', 'department_store'],
     }
   },
   entertainment: {
     category: 'entertainment',
     tags: {
-      amenity: ['cinema', 'theatre', 'restaurant', 'fast_food', 'cafe'],
-      leisure: ['fitness_centre', 'sports_centre'],
+      amenity: ['cinema', 'theatre'],
+      leisure: ['fitness_centre', 'sports_centre', 'stadium'],
     }
   },
   transport: {
     category: 'transport',
     tags: {
       aeroway: ['aerodrome'],
-      railway: ['station', 'halt'],
+      railway: ['station'],
       amenity: ['bus_station'],
-      highway: ['bus_stop'],
     }
   }
 };
@@ -85,6 +84,8 @@ export async function fetchAmenities(
         const elementLng = element.lon || element.center?.lon;
         
         if (!elementLat || !elementLng) continue;
+
+        if (!isNotablePlace(element.tags, category)) continue;
 
         const distance = turf.distance(
           turf.point([lng, lat]),
@@ -209,6 +210,52 @@ function buildOverpassQuery(lat: number, lng: number, radius: number, tags: Reco
     );
     out center;
   `;
+}
+
+function isNotablePlace(tags: any, category: string): boolean {
+  if (!tags) return false;
+
+  if (tags.name || tags['name:vi'] || tags['name:en']) {
+    return true;
+  }
+
+  if (tags.brand || tags['brand:wikidata']) {
+    return true;
+  }
+
+  if (tags.wikidata || tags.wikipedia) {
+    return true;
+  }
+
+  if (category === 'transport') {
+    if (tags.aeroway === 'aerodrome') return true;
+    if (tags.railway === 'station') return true;
+    if (tags.amenity === 'bus_station') return true;
+    if (tags.operator) return true;
+  }
+
+  if (category === 'shopping') {
+    if (tags.shop === 'mall' || tags.shop === 'supermarket' || tags.shop === 'department_store') return true;
+  }
+
+  if (category === 'healthcare') {
+    if (tags.amenity === 'hospital' || tags.healthcare === 'hospital') return true;
+    if (tags.amenity === 'clinic') return true;
+    if (tags.amenity === 'doctors') return true;
+    if (tags.amenity === 'pharmacy' && (tags.name || tags.brand)) return true;
+  }
+
+  if (category === 'education') {
+    if (tags.amenity === 'university' || tags.amenity === 'college') return true;
+    if (tags.amenity === 'school' && tags.operator) return true;
+  }
+
+  if (category === 'entertainment') {
+    if (tags.amenity === 'cinema' || tags.amenity === 'theatre') return true;
+    if (tags.leisure === 'stadium' || tags.leisure === 'sports_centre' || tags.leisure === 'fitness_centre') return true;
+  }
+
+  return false;
 }
 
 function getDefaultName(tags: any, category: string): string {

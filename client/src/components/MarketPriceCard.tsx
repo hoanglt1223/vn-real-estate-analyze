@@ -10,6 +10,10 @@ interface PriceData {
   median: number;
   listingCount: number;
   trend?: 'up' | 'down' | 'stable';
+  sources?: Array<{
+    name: string;
+    type: string;
+  }>;
 }
 
 interface MarketPriceCardProps {
@@ -91,6 +95,24 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
             {data.listingCount} tin
           </Badge>
         </div>
+
+        {data.sources && data.sources.length > 0 && (
+          <div className="pt-2 border-t">
+            <p className="text-xs font-semibold mb-2">Nguồn dữ liệu:</p>
+            <div className="space-y-1">
+              {data.sources.map((source, idx) => (
+                <div key={idx} className="text-xs text-muted-foreground">
+                  <span>• {source.name}</span>
+                  {source.type && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      {source.type}
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

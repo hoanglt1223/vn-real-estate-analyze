@@ -9,7 +9,7 @@ import { z } from "zod";
 
 const analyzePropertySchema = z.object({
   coordinates: z.array(z.array(z.number())),
-  radius: z.number().min(100).max(5000),
+  radius: z.number().min(100).max(30000),
   categories: z.array(z.string()),
   layers: z.array(z.string())
 });

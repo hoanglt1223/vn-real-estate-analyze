@@ -65,7 +65,7 @@ export default function AmenitiesFilter({
     onCategoryChange?.(updated);
   };
 
-  const radiusPresets = [100, 500, 1000, 5000];
+  const radiusPresets = [500, 1000, 5000, 10000, 30000];
 
   return (
     <Card className="w-full">
@@ -84,7 +84,7 @@ export default function AmenitiesFilter({
             value={[radius]}
             onValueChange={(value) => onRadiusChange?.(value[0])}
             min={100}
-            max={5000}
+            max={30000}
             step={100}
             data-testid="slider-radius"
           />

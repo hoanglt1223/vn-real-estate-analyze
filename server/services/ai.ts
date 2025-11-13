@@ -23,6 +23,14 @@ export interface AIAnalysisResult {
     investment: number;
     risk: number;
   };
+  scoreExplanations: {
+    overall: string;
+    amenities: string;
+    planning: string;
+    residential: string;
+    investment: string;
+    risk: string;
+  };
   recommendation: 'buy' | 'consider' | 'avoid';
   estimatedPrice: number;
   summary: string;
@@ -52,7 +60,7 @@ export async function analyzeProperty(input: AIAnalysisInput): Promise<AIAnalysi
     recommendation = 'avoid';
   }
 
-  const estimatedPrice = input.marketData.avg || 0;
+  const estimatedPrice = input.marketData?.avg || 0;
 
   const summary = await generateAISummary(input, {
     overall,
@@ -63,22 +71,70 @@ export async function analyzeProperty(input: AIAnalysisInput): Promise<AIAnalysi
     riskScore
   });
 
+  const scoreObject = {
+    overall,
+    amenities: amenitiesScore,
+    planning: planningScore,
+    residential: residentialScore,
+    investment: investmentScore,
+    risk: riskScore
+  };
+
+  const explanations = generateScoreExplanations(input, scoreObject);
+
   return {
-    scores: {
-      overall,
-      amenities: amenitiesScore,
-      planning: planningScore,
-      residential: residentialScore,
-      investment: investmentScore,
-      risk: riskScore
-    },
+    scores: scoreObject,
+    scoreExplanations: explanations,
     recommendation,
     estimatedPrice,
     summary
   };
 }
 
-function calculateAmenitiesScore(amenities: any[]): number {
+interface ScoreObject {
+  overall: number;
+  amenities: number;
+  planning: number;
+  residential: number;
+  investment: number;
+  risk: number;
+}
+
+function generateScoreExplanations(input: AIAnalysisInput, scores: ScoreObject) {
+  const amenitiesCount = input.amenities?.length || 0;
+  const closeAmenities = input.amenities?.filter(a => a.distance < 1000).length || 0;
+  const mediumAmenities = input.amenities?.filter(a => a.distance >= 1000 && a.distance < 3000).length || 0;
+  
+  const roadsCount = input.infrastructure?.roads?.length || 0;
+  const metroCount = input.infrastructure?.metro?.length || 0;
+  const waterCount = input.infrastructure?.water?.length || 0;
+  
+  const trend = input.marketData?.trend || 'stable';
+  const risksCount = input.risks?.length || 0;
+  
+  const amenitiesValue = scores.amenities || 0;
+  const planningValue = scores.planning || 0;
+  const residentialValue = scores.residential || 0;
+  const investmentValue = scores.investment || 0;
+  const riskValue = scores.risk || 0;
+  const overallValue = scores.overall || 0;
+  
+  return {
+    overall: `Điểm tổng hợp từ: Tiện ích (25%), Quy hoạch (20%), Rủi ro (20%), An cư (20%), Đầu tư (15%). Công thức: (${amenitiesValue}×0.25 + ${planningValue}×0.2 + ${100-riskValue}×0.2 + ${residentialValue}×0.2 + ${investmentValue}×0.15) = ${overallValue}`,
+    
+    amenities: `Dựa trên ${amenitiesCount} tiện ích xung quanh. ${closeAmenities} địa điểm trong bán kính 1km (+10 điểm/địa điểm), ${mediumAmenities} địa điểm trong 1-3km (+5 điểm/địa điểm). Tối đa 25 điểm/danh mục.`,
+    
+    planning: `Điểm cơ bản 50. ${roadsCount > 0 ? '+15 (có đường lớn)' : ''} ${metroCount > 0 ? '+20 (có metro)' : ''} ${waterCount > 0 ? '+10 (gần sông/kênh)' : ''}. Tối đa 100 điểm.`,
+    
+    residential: `Điểm cơ bản 60. Trường học gần (+5/trường, max 15), Y tế gần (+3/nơi, max 10), Mua sắm gần (+3/nơi, max 10). ${['Đông', 'Đông Nam', 'Nam'].includes(input.orientation) ? '+5 (hướng tốt)' : ''}. Trừ điểm nếu có rủi ro cao (-15/rủi ro).`,
+    
+    investment: `Điểm cơ bản 50. ${trend === 'up' ? '+15 (giá tăng)' : trend === 'down' ? '-10 (giá giảm)' : '+0 (giá ổn định)'}. ${metroCount > 0 ? '+20 (có metro)' : ''} ${roadsCount >= 3 ? '+10 (nhiều đường lớn)' : ''}. ${input.area > 100 && input.area < 500 ? '+5 (diện tích phù hợp)' : ''}.`,
+    
+    risk: `Điểm cơ bản 10. Mỗi rủi ro cao +30, trung bình +15, thấp +5. Tổng ${risksCount} rủi ro được phát hiện. Điểm càng thấp càng tốt.`
+  };
+}
+
+function calculateAmenitiesScore(amenities: any[] | undefined): number {
   if (!amenities || amenities.length === 0) return 30;
 
   const categories = ['education', 'healthcare', 'shopping', 'entertainment'];
@@ -95,7 +151,7 @@ function calculateAmenitiesScore(amenities: any[]): number {
   return Math.round(categoryScores.reduce((a, b) => a + b, 0));
 }
 
-function calculatePlanningScore(infrastructure: any): number {
+function calculatePlanningScore(infrastructure: any | undefined): number {
   if (!infrastructure) return 50;
 
   let score = 50;
@@ -118,7 +174,7 @@ function calculatePlanningScore(infrastructure: any): number {
   return Math.min(100, score);
 }
 
-function calculateRiskScore(risks: any[]): number {
+function calculateRiskScore(risks: any[] | undefined): number {
   if (!risks || risks.length === 0) return 10;
 
   let score = 10;
@@ -132,8 +188,11 @@ function calculateRiskScore(risks: any[]): number {
   return Math.min(100, score);
 }
 
-function calculateResidentialScore(amenities: any[], risks: any[], orientation: string): number {
+function calculateResidentialScore(amenities: any[] | undefined, risks: any[] | undefined, orientation: string): number {
   let score = 60;
+  
+  if (!amenities) amenities = [];
+  if (!risks) risks = [];
 
   const educationNearby = amenities.filter(a => a.category === 'education' && a.distance < 1000).length;
   const healthcareNearby = amenities.filter(a => a.category === 'healthcare' && a.distance < 2000).length;
@@ -154,20 +213,20 @@ function calculateResidentialScore(amenities: any[], risks: any[], orientation: 
   return Math.max(0, Math.min(100, score));
 }
 
-function calculateInvestmentScore(marketData: any, infrastructure: any, area: number): number {
+function calculateInvestmentScore(marketData: any | undefined, infrastructure: any | undefined, area: number): number {
   let score = 50;
 
-  if (marketData.trend === 'up') {
+  if (marketData?.trend === 'up') {
     score += 15;
-  } else if (marketData.trend === 'down') {
+  } else if (marketData?.trend === 'down') {
     score -= 10;
   }
 
-  if (infrastructure.metro && infrastructure.metro.length > 0) {
+  if (infrastructure?.metro && infrastructure.metro.length > 0) {
     score += 20;
   }
 
-  if (infrastructure.roads && infrastructure.roads.length >= 3) {
+  if (infrastructure?.roads && infrastructure.roads.length >= 3) {
     score += 10;
   }
 
