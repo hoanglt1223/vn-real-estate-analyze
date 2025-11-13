@@ -87,6 +87,56 @@ export default function MapView({
     map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
     map.current.addControl(new mapboxgl.FullscreenControl(), 'bottom-right');
 
+    const geocoderContainer = document.createElement('div');
+    geocoderContainer.className = 'mapboxgl-ctrl';
+    geocoderContainer.style.position = 'absolute';
+    geocoderContainer.style.top = '10px';
+    geocoderContainer.style.left = '10px';
+    geocoderContainer.style.zIndex = '1';
+    geocoderContainer.innerHTML = `
+      <div style="background:white;padding:8px;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,0.1);display:flex;align-items:center;gap:8px;">
+        <input 
+          type="text" 
+          placeholder="Tìm kiếm địa chỉ tại Việt Nam..." 
+          id="geocoder-search"
+          style="border:1px solid #ddd;padding:6px 12px;border-radius:4px;width:300px;font-size:14px;outline:none;"
+        />
+        <button 
+          id="geocoder-btn"
+          style="background:#3B82F6;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:14px;"
+        >Tìm</button>
+      </div>
+    `;
+    
+    const searchInput = geocoderContainer.querySelector('#geocoder-search') as HTMLInputElement;
+    const searchBtn = geocoderContainer.querySelector('#geocoder-btn') as HTMLButtonElement;
+    
+    const performSearch = async () => {
+      const query = searchInput.value.trim();
+      if (!query) return;
+      
+      try {
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=vn&access_token=${mapboxgl.accessToken}`
+        );
+        const data = await response.json();
+        
+        if (data.features && data.features.length > 0) {
+          const [lng, lat] = data.features[0].center;
+          map.current?.flyTo({ center: [lng, lat], zoom: 15 });
+        }
+      } catch (error) {
+        console.error('Geocoding error:', error);
+      }
+    };
+    
+    searchBtn.addEventListener('click', performSearch);
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') performSearch();
+    });
+    
+    mapContainer.current?.appendChild(geocoderContainer);
+
     const layerControl = document.createElement('div');
     layerControl.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
     layerControl.innerHTML = `
@@ -113,10 +163,10 @@ export default function MapView({
     controlContainer.appendChild(layerControl);
     mapContainer.current?.appendChild(controlContainer);
 
-    map.current.on('load', () => {
-      setIsLoaded(true);
+    const addRadiusLayers = () => {
+      if (!map.current) return;
       
-      if (map.current) {
+      if (!map.current.getSource(radiusSourceRef.current)) {
         map.current.addSource(radiusSourceRef.current, {
           type: 'geojson',
           data: {
@@ -124,7 +174,9 @@ export default function MapView({
             features: []
           }
         });
+      }
 
+      if (!map.current.getLayer('radius-circle-fill')) {
         map.current.addLayer({
           id: 'radius-circle-fill',
           type: 'fill',
@@ -134,7 +186,9 @@ export default function MapView({
             'fill-opacity': 0.1
           }
         });
+      }
 
+      if (!map.current.getLayer('radius-circle-outline')) {
         map.current.addLayer({
           id: 'radius-circle-outline',
           type: 'line',
@@ -146,39 +200,15 @@ export default function MapView({
           }
         });
       }
+    };
+
+    map.current.on('load', () => {
+      setIsLoaded(true);
+      addRadiusLayers();
     });
 
     map.current.on('style.load', () => {
-      if (map.current && !map.current.getSource(radiusSourceRef.current)) {
-        map.current.addSource(radiusSourceRef.current, {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: []
-          }
-        });
-
-        map.current.addLayer({
-          id: 'radius-circle-fill',
-          type: 'fill',
-          source: radiusSourceRef.current,
-          paint: {
-            'fill-color': '#3B82F6',
-            'fill-opacity': 0.1
-          }
-        });
-
-        map.current.addLayer({
-          id: 'radius-circle-outline',
-          type: 'line',
-          source: radiusSourceRef.current,
-          paint: {
-            'line-color': '#3B82F6',
-            'line-width': 2,
-            'line-dasharray': [2, 2]
-          }
-        });
-      }
+      addRadiusLayers();
     });
 
     map.current.on('draw.create', updatePolygon);
