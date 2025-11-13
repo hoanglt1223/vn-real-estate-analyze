@@ -1,22 +1,33 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Loader2 } from 'lucide-react';
-import mapboxgl from 'mapbox-gl';
+import { Search, Loader2, MapPin } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { apiRequest } from '@/lib/queryClient';
 
-interface SearchResult {
+interface VNSearchResult {
+  name: string;
+  fullName: string;
+  type: 'province' | 'district' | 'ward';
+  province?: string;
+  district?: string;
+  code: number;
+  geocodeQuery: string;
+}
+
+interface GeocodedResult {
   id: string;
   place_name: string;
   center: [number, number];
-  bbox?: [number, number, number, number];
 }
 
 interface SearchAutocompleteProps {
-  onSelect: (result: SearchResult) => void;
+  onSelect: (result: GeocodedResult) => void;
 }
 
 export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<VNSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -48,32 +59,23 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
 
     debounceTimer.current = setTimeout(async () => {
       try {
-        const token = import.meta.env.VITE_MAPBOX_TOKEN || mapboxgl.accessToken;
-        if (!token) {
-          console.error('Mapbox token not found');
-          setIsLoading(false);
-          return;
-        }
-
-        const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=vn&limit=5&language=vi&access_token=${token}`
-        );
+        const response = await fetch(`/api/locations/search?q=${encodeURIComponent(query)}`);
         
         if (!response.ok) {
-          throw new Error(`Geocoding API error: ${response.status}`);
+          throw new Error(`Search API error: ${response.status}`);
         }
         
-        const data = await response.json();
+        const data: VNSearchResult[] = await response.json();
         
-        if (data.features && data.features.length > 0) {
-          setResults(data.features);
+        if (data.length > 0) {
+          setResults(data);
           setIsOpen(true);
         } else {
           setResults([]);
           setIsOpen(true);
         }
       } catch (error) {
-        console.error('Geocoding error:', error);
+        console.error('Location search error:', error);
         setResults([]);
       } finally {
         setIsLoading(false);
@@ -87,10 +89,37 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
     };
   }, [query]);
 
-  const handleSelect = (result: SearchResult) => {
-    setQuery(result.place_name);
+  const handleSelect = async (result: VNSearchResult) => {
+    setQuery(result.fullName);
     setIsOpen(false);
-    onSelect(result);
+    setIsGeocoding(true);
+
+    try {
+      // Geocode the selected location using TrackAsia
+      const geocoded = await apiRequest<{ coordinates: [number, number]; placeName: string }>(
+        '/api/locations/geocode',
+        {
+          method: 'POST',
+          body: JSON.stringify({ query: result.geocodeQuery }),
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      // Transform to expected format for map
+      const geocodedResult: GeocodedResult = {
+        id: `${result.code}-${result.type}`,
+        place_name: result.fullName,
+        center: geocoded.coordinates
+      };
+
+      onSelect(geocodedResult);
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      // Fallback: still try to display the location name even if geocoding fails
+      alert('Không thể xác định tọa độ cho địa điểm này. Vui lòng thử lại.');
+    } finally {
+      setIsGeocoding(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -110,6 +139,32 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
     }
   };
 
+  const getTypeBadgeColor = (type: string) => {
+    switch (type) {
+      case 'province':
+        return 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border-blue-500/20';
+      case 'district':
+        return 'bg-green-500/10 text-green-700 dark:bg-green-500/20 dark:text-green-300 border-green-500/20';
+      case 'ward':
+        return 'bg-purple-500/10 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 border-purple-500/20';
+      default:
+        return 'bg-gray-500/10 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300 border-gray-500/20';
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'province':
+        return 'Tỉnh/TP';
+      case 'district':
+        return 'Quận/Huyện';
+      case 'ward':
+        return 'Phường/Xã';
+      default:
+        return type;
+    }
+  };
+
   return (
     <div ref={wrapperRef} className="relative w-full max-w-md">
       <div className="relative">
@@ -119,11 +174,12 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Tìm kiếm địa chỉ tại Việt Nam..."
-          className="w-full pl-10 pr-10 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+          placeholder="Tìm kiếm tỉnh/thành phố, quận/huyện..."
+          className="w-full pl-10 pr-10 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-sm bg-background"
           data-testid="input-search-address"
+          disabled={isGeocoding}
         />
-        {isLoading && (
+        {(isLoading || isGeocoding) && (
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
         )}
       </div>
@@ -132,7 +188,7 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
         <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-80 overflow-y-auto">
           {results.map((result, index) => (
             <button
-              key={result.id}
+              key={`${result.code}-${result.type}`}
               onClick={() => handleSelect(result)}
               onMouseEnter={() => setSelectedIndex(index)}
               className={`w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b last:border-b-0 ${
@@ -141,13 +197,21 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
               data-testid={`search-result-${index}`}
             >
               <div className="flex items-start gap-2">
-                <Search className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">
-                    {result.place_name.split(',')[0]}
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="text-sm font-medium truncate">
+                      {result.name}
+                    </div>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs px-1.5 py-0 ${getTypeBadgeColor(result.type)}`}
+                    >
+                      {getTypeLabel(result.type)}
+                    </Badge>
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {result.place_name}
+                    {result.fullName}
                   </div>
                 </div>
               </div>
