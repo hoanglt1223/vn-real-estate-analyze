@@ -18,7 +18,18 @@ interface AdvancedSearchPanelProps {
 export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: AdvancedSearchPanelProps) {
   const { toast } = useToast();
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  const [searchCriteria, setSearchCriteria] = useState({
+  const [searchCriteria, setSearchCriteria] = useState<{
+    query: string;
+    propertyType: string;
+    sortBy: string;
+    sortOrder: string;
+    minScore: number | undefined;
+    maxScore: number | undefined;
+    minPrice: number | undefined;
+    maxPrice: number | undefined;
+    minArea: number | undefined;
+    maxArea: number | undefined;
+  }>({
     query: '',
     propertyType: '',
     sortBy: 'date',
@@ -198,7 +209,7 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
                   min="0"
                   max="100"
                   value={searchCriteria.minScore || ''}
-                  onChange={(e) => setSearchCriteria({ ...searchCriteria, minScore: e.target.value ? parseInt(e.target.value) : undefined })}
+                  onChange={(e) => setSearchCriteria({ ...searchCriteria, minScore: e.target.value ? parseInt(e.target.value) as number : undefined })}
                   className="mt-1"
                 />
               </div>
@@ -212,7 +223,7 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
                   min="0"
                   max="100"
                   value={searchCriteria.maxScore || ''}
-                  onChange={(e) => setSearchCriteria({ ...searchCriteria, maxScore: e.target.value ? parseInt(e.target.value) : undefined })}
+                  onChange={(e) => setSearchCriteria({ ...searchCriteria, maxScore: e.target.value ? parseInt(e.target.value) as number : undefined })}
                   className="mt-1"
                 />
               </div>
@@ -224,7 +235,7 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
                   type="number"
                   placeholder="0"
                   value={searchCriteria.minPrice ? searchCriteria.minPrice / 1000000 : ''}
-                  onChange={(e) => setSearchCriteria({ ...searchCriteria, minPrice: e.target.value ? parseInt(e.target.value) * 1000000 : undefined })}
+                  onChange={(e) => setSearchCriteria({ ...searchCriteria, minPrice: e.target.value ? parseInt(e.target.value) as number * 1000000 : undefined })}
                   className="mt-1"
                 />
               </div>
@@ -236,7 +247,7 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
                   type="number"
                   placeholder="1000"
                   value={searchCriteria.maxPrice ? searchCriteria.maxPrice / 1000000 : ''}
-                  onChange={(e) => setSearchCriteria({ ...searchCriteria, maxPrice: e.target.value ? parseInt(e.target.value) * 1000000 : undefined })}
+                  onChange={(e) => setSearchCriteria({ ...searchCriteria, maxPrice: e.target.value ? parseInt(e.target.value) as number * 1000000 : undefined })}
                   className="mt-1"
                 />
               </div>
@@ -248,7 +259,7 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
                   type="number"
                   placeholder="0"
                   value={searchCriteria.minArea || ''}
-                  onChange={(e) => setSearchCriteria({ ...searchCriteria, minArea: e.target.value ? parseInt(e.target.value) : undefined })}
+                  onChange={(e) => setSearchCriteria({ ...searchCriteria, minArea: e.target.value ? parseInt(e.target.value) as number : undefined })}
                   className="mt-1"
                 />
               </div>
@@ -260,7 +271,7 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
                   type="number"
                   placeholder="1000"
                   value={searchCriteria.maxArea || ''}
-                  onChange={(e) => setSearchCriteria({ ...searchCriteria, maxArea: e.target.value ? parseInt(e.target.value) : undefined })}
+                  onChange={(e) => setSearchCriteria({ ...searchCriteria, maxArea: e.target.value ? parseInt(e.target.value) as number : undefined })}
                   className="mt-1"
                 />
               </div>

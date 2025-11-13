@@ -88,6 +88,15 @@ export class MemStorage implements IStorage {
       ...analysis,
       id,
       createdAt: new Date(),
+      amenities: analysis.amenities ?? null,
+      infrastructure: analysis.infrastructure ?? null,
+      risks: analysis.risks ?? null,
+      propertyType: analysis.propertyType ?? null,
+      marketData: analysis.marketData ?? null,
+      aiAnalysis: analysis.aiAnalysis ?? null,
+      valuation: analysis.valuation ?? null,
+      askingPrice: analysis.askingPrice ?? null,
+      notes: analysis.notes ?? null,
     };
     this.propertyAnalyses.set(id, propertyAnalysis);
     return propertyAnalysis;
@@ -461,43 +470,49 @@ export class DbStorage implements IStorage {
       return this.memCache.searchPropertyAnalyses(criteria);
     }
 
-    // Build the query
-    let query = db.select().from(propertyAnalyses);
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
+    // Combine all conditions
+    const allConditions = [...conditions];
 
     // Apply simple filters
     if (criteria.minArea !== undefined) {
-      query = query.where(gte(propertyAnalyses.area, criteria.minArea));
+      allConditions.push(gte(propertyAnalyses.area, criteria.minArea));
     }
     if (criteria.maxArea !== undefined) {
-      query = query.where(lte(propertyAnalyses.area, criteria.maxArea));
+      allConditions.push(lte(propertyAnalyses.area, criteria.maxArea));
     }
     if (criteria.propertyType) {
-      query = query.where(eq(propertyAnalyses.propertyType, criteria.propertyType));
+      allConditions.push(eq(propertyAnalyses.propertyType, criteria.propertyType));
+    }
+
+    // Build the query with all conditions
+    const { desc, asc } = await import('drizzle-orm');
+    const order = criteria.sortOrder === 'asc' ? asc : desc;
+
+    let query = db.select().from(propertyAnalyses);
+
+    // Apply where conditions if any exist
+    if (allConditions.length > 0) {
+      query = query.where(and(...allConditions)) as any;
     }
 
     // Apply sorting
-    const { desc, asc } = await import('drizzle-orm');
-    const order = criteria.sortOrder === 'asc' ? asc : desc;
     switch (criteria.sortBy) {
       case 'date':
-        query = query.orderBy(order(propertyAnalyses.createdAt));
+        query = query.orderBy(order(propertyAnalyses.createdAt)) as any;
         break;
       case 'area':
-        query = query.orderBy(order(propertyAnalyses.area));
+        query = query.orderBy(order(propertyAnalyses.area)) as any;
         break;
       default:
-        query = query.orderBy(desc(propertyAnalyses.createdAt));
+        query = query.orderBy(desc(propertyAnalyses.createdAt)) as any;
     }
 
     // Apply pagination
-    if (criteria.offset !== undefined) {
-      query = query.offset(criteria.offset);
-    }
     if (criteria.limit !== undefined) {
-      query = query.limit(criteria.limit);
+      query = query.limit(criteria.limit) as any;
+    }
+    if (criteria.offset !== undefined) {
+      query = query.offset(criteria.offset) as any;
     }
 
     const results = await query;

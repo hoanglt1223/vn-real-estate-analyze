@@ -176,6 +176,9 @@ importers:
       multer:
         specifier: ^2.0.2
         version: 2.0.2
+      nanoid:
+        specifier: ^5.1.6
+        version: 5.1.6
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -307,8 +310,8 @@ importers:
         specifier: ^4.20.5
         version: 4.20.6
       typescript:
-        specifier: 5.6.3
-        version: 5.6.3
+        specifier: ^5.9.3
+        version: 5.9.3
       vite:
         specifier: ^7.2.2
         version: 7.2.2(@types/node@22.19.1)(jiti@1.21.7)(lightningcss@1.30.2)(tsx@4.20.6)
@@ -4329,8 +4332,8 @@ packages:
     engines: {node: '>=4.2.0'}
     hasBin: true
 
-  typescript@5.6.3:
-    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -9093,7 +9096,7 @@ snapshots:
 
   typescript@4.9.5: {}
 
-  typescript@5.6.3: {}
+  typescript@5.9.3: {}
 
   uid-safe@2.1.5:
     dependencies:

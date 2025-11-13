@@ -200,7 +200,7 @@ export default function AnalysisPage() {
 
               {propertyData.area > 0 && (
                 <Button
-                  onClick={handleAnalyze}
+                  onClick={() => handleAnalyze()}
                   disabled={isAnalyzing}
                   className="w-full"
                   size="lg"
