@@ -41,6 +41,7 @@ export interface LocationSuggestion {
   type: 'address' | 'place' | 'poi' | 'locality' | 'neighborhood';
   code: number;
   geocodeQuery: string;
+  mapboxId?: string;
 }
 
 export async function suggestLocations(query: string, options?: { limit?: number; sessionToken?: string; types?: string; proximity?: string; country?: string; language?: string }): Promise<LocationSuggestion[]> {
@@ -63,7 +64,8 @@ export async function suggestLocations(query: string, options?: { limit?: number
     fullName: s.place_formatted || s.name || query,
     type: (s.feature_type || 'place') as LocationSuggestion['type'],
     code: 100000 + i,
-    geocodeQuery: s.place_formatted || s.name || query
+    geocodeQuery: s.place_formatted || s.name || query,
+    mapboxId: s.mapbox_id || s.id
   })) : [];
   return suggestions;
 }

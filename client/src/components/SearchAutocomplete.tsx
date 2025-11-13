@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Loader2, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { API_ENDPOINTS } from '@/lib/api';
+import { API_ENDPOINTS, suggestLocations as apiSuggestLocations, retrieveLocation as apiRetrieveLocation } from '@/lib/api';
 
 interface VNSearchResult {
   name: string;
@@ -11,6 +11,7 @@ interface VNSearchResult {
   district?: string;
   code: number;
   geocodeQuery: string;
+  mapboxId?: string;
 }
 
 interface GeocodedResult {
@@ -32,6 +33,7 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout>();
+  const [sessionToken] = useState<string>(() => crypto.randomUUID());
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -59,13 +61,11 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
 
     debounceTimer.current = setTimeout(async () => {
       try {
-        const response = await fetch(API_ENDPOINTS.locationsSearch(query));
-        
-        if (!response.ok) {
-          throw new Error(`Search API error: ${response.status}`);
-        }
-        
-        const data: VNSearchResult[] = await response.json();
+        const data: VNSearchResult[] = await apiSuggestLocations(query, {
+          limit: 10,
+          types: 'address,place,poi,locality,neighborhood',
+          sessionToken
+        });
         
         if (data.length > 0) {
           setResults(data);
@@ -95,24 +95,18 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
     setIsGeocoding(true);
 
     try {
-      // Geocode the selected location using TrackAsia
-      const response = await fetch(API_ENDPOINTS.locationsGeocode, {
+      const retrieved = result.mapboxId ? await apiRetrieveLocation(result.mapboxId, sessionToken) : await fetch(API_ENDPOINTS.locationsGeocode, {
         method: 'POST',
-        body: JSON.stringify({ query: result.geocodeQuery }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Geocoding failed: ${response.status}`);
-      }
-
-      const geocoded: { coordinates: [number, number]; placeName: string } = await response.json();
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: result.geocodeQuery })
+      }).then(r => r.json());
 
       // Transform to expected format for map
+      const coords: [number, number] = (retrieved.coordinates as [number, number]) || (retrieved?.coordinates as [number, number]);
       const geocodedResult: GeocodedResult = {
         id: `${result.code}-${result.type}`,
         place_name: result.fullName,
-        center: geocoded.coordinates
+        center: coords
       };
 
       onSelect(geocodedResult);
