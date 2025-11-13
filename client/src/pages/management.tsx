@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,13 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Edit, Trash2, MapPin, Calendar, DollarSign, ArrowLeft } from 'lucide-react';
+import { Edit, Trash2, MapPin, Calendar, DollarSign, ArrowLeft, Search, FileDown, Plus } from 'lucide-react';
 import type { PropertyAnalysis } from '@shared/schema';
 
 export default function ManagementPage() {
   const { toast } = useToast();
   const [editingProperty, setEditingProperty] = useState<PropertyAnalysis | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [scoreFilter, setScoreFilter] = useState<string>('all');
+  const [priceFilter, setPriceFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('date');
 
   const { data: properties, isLoading } = useQuery<PropertyAnalysis[]>({
     queryKey: ['/api/properties']
@@ -26,10 +30,8 @@ export default function ManagementPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<PropertyAnalysis> }) => {
-      return apiRequest(`/api/properties/${data.id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data.updates)
-      });
+      const res = await apiRequest('PUT', `/api/properties/${data.id}`, data.updates);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
@@ -51,9 +53,8 @@ export default function ManagementPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/properties/${id}`, {
-        method: 'DELETE'
-      });
+      const res = await apiRequest('DELETE', `/api/properties/${id}`);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
@@ -101,6 +102,114 @@ export default function ManagementPage() {
       deleteMutation.mutate(id);
     }
   };
+
+  const handleExport = () => {
+    if (!properties || properties.length === 0) {
+      toast({
+        title: 'Không có dữ liệu',
+        description: 'Không có bất động sản nào để xuất',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Sanitize and validate data before export
+    const exportData = properties.map(p => ({
+      id: p.id,
+      coordinates: p.coordinates,
+      area: p.area,
+      orientation: p.orientation || 'N/A',
+      frontageCount: p.frontageCount,
+      center: p.center,
+      propertyType: p.propertyType || null,
+      valuation: p.valuation || null,
+      askingPrice: p.askingPrice || null,
+      notes: p.notes || null,
+      aiAnalysis: p.aiAnalysis ? {
+        scores: p.aiAnalysis.scores,
+        recommendation: p.aiAnalysis.recommendation,
+        summary: p.aiAnalysis.summary
+      } : null,
+      marketData: p.marketData ? {
+        avgPrice: p.marketData.avgPrice,
+        avgPricePerSqm: p.marketData.avgPricePerSqm,
+        minPrice: p.marketData.minPrice,
+        maxPrice: p.marketData.maxPrice
+      } : null,
+      createdAt: p.createdAt
+    }));
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `properties-export-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: 'Đã xuất',
+      description: `Đã xuất ${exportData.length} bất động sản`,
+    });
+  };
+
+  const filteredProperties = properties
+    ?.filter(p => {
+      // Search filter - handle undefined/null values
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesNotes = p.notes?.toLowerCase().includes(query) || false;
+        const matchesType = p.propertyType?.toLowerCase().includes(query) || false;
+        const matchesOrientation = p.orientation?.toLowerCase().includes(query) || false;
+        if (!matchesNotes && !matchesType && !matchesOrientation) return false;
+      }
+
+      // Score filter - only filter if property has aiAnalysis
+      if (scoreFilter !== 'all') {
+        const score = p.aiAnalysis?.scores?.overall || 0;
+        if (scoreFilter === 'high' && score < 70) return false;
+        if (scoreFilter === 'medium' && (score < 40 || score >= 70)) return false;
+        if (scoreFilter === 'low' && score >= 40) return false;
+      }
+
+      // Price filter - only filter if property has price data
+      if (priceFilter !== 'all') {
+        const pricePerSqm = p.marketData?.avgPricePerSqm;
+        if (!pricePerSqm) return false; // Skip properties without price data when filtering by price
+        if (priceFilter === 'high' && pricePerSqm < 100000000) return false;
+        if (priceFilter === 'medium' && (pricePerSqm < 50000000 || pricePerSqm >= 100000000)) return false;
+        if (priceFilter === 'low' && pricePerSqm >= 50000000) return false;
+      }
+
+      return true;
+    })
+    ?.sort((a, b) => {
+      switch (sortBy) {
+        case 'date': {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        }
+        case 'score': {
+          const scoreA = a.aiAnalysis?.scores?.overall || 0;
+          const scoreB = b.aiAnalysis?.scores?.overall || 0;
+          return scoreB - scoreA;
+        }
+        case 'price': {
+          const priceA = a.marketData?.avgPricePerSqm || 0;
+          const priceB = b.marketData?.avgPricePerSqm || 0;
+          return priceB - priceA;
+        }
+        case 'area': {
+          const areaA = a.area || 0;
+          const areaB = b.area || 0;
+          return areaB - areaA;
+        }
+        default:
+          return 0;
+      }
+    });
 
   const formatCurrency = (amount: number | null | undefined) => {
     if (!amount) return 'Chưa cập nhật';
@@ -158,32 +267,103 @@ export default function ManagementPage() {
   return (
     <div className="flex flex-col h-screen">
       <div className="border-b bg-background p-4">
-        <div className="flex items-center gap-3">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            data-testid="button-back"
-          >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              data-testid="button-back"
+            >
+              <Link href="/">
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Quay lại
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Quản Lý Bất Động Sản</h1>
+              <p className="text-muted-foreground text-sm">
+                Hiển thị {filteredProperties?.length || 0} / {properties?.length || 0} bất động sản
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleExport} variant="outline" data-testid="button-export">
+              <FileDown className="w-4 h-4 mr-2" />
+              Xuất
+            </Button>
             <Link href="/">
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Quay lại
+              <Button data-testid="button-new-analysis">
+                <Plus className="w-4 h-4 mr-2" />
+                Tạo mới
+              </Button>
             </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Quản Lý Bất Động Sản</h1>
-            <p className="text-muted-foreground text-sm">
-              Danh sách các khu đất đã phân tích ({properties?.length || 0})
-            </p>
           </div>
         </div>
       </div>
       
       <div className="flex-1 overflow-hidden">
         <div className="container mx-auto p-6 h-full">
-          <ScrollArea className="h-[calc(100vh-160px)]">
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Bộ lọc & Tìm kiếm</CardTitle>
+              <CardDescription>Lọc và sắp xếp danh sách bất động sản</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Tìm kiếm..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-properties"
+                  />
+                </div>
+                
+                <Select value={scoreFilter} onValueChange={setScoreFilter}>
+                  <SelectTrigger data-testid="select-score-filter">
+                    <SelectValue placeholder="Lọc theo điểm" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả điểm</SelectItem>
+                    <SelectItem value="high">Cao (≥70)</SelectItem>
+                    <SelectItem value="medium">Trung bình (40-69)</SelectItem>
+                    <SelectItem value="low">Thấp (&lt;40)</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={priceFilter} onValueChange={setPriceFilter}>
+                  <SelectTrigger data-testid="select-price-filter">
+                    <SelectValue placeholder="Lọc theo giá" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả mức giá</SelectItem>
+                    <SelectItem value="high">Cao (≥100 triệu/m²)</SelectItem>
+                    <SelectItem value="medium">Trung bình (50-100 triệu/m²)</SelectItem>
+                    <SelectItem value="low">Thấp (&lt;50 triệu/m²)</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger data-testid="select-sort-by">
+                    <SelectValue placeholder="Sắp xếp theo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">Mới nhất</SelectItem>
+                    <SelectItem value="score">Điểm cao nhất</SelectItem>
+                    <SelectItem value="price">Giá cao nhất</SelectItem>
+                    <SelectItem value="area">Diện tích lớn nhất</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <ScrollArea className="h-[calc(100vh-340px)]">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {properties?.map((property) => (
+              {filteredProperties?.map((property) => (
                 <Card key={property.id} className="hover-elevate" data-testid={`card-property-${property.id}`}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
@@ -265,10 +445,12 @@ export default function ManagementPage() {
                 </Card>
               ))}
 
-              {properties?.length === 0 && (
+              {filteredProperties?.length === 0 && (
                 <div className="col-span-full text-center py-12">
                   <p className="text-muted-foreground">
-                    Chưa có bất động sản nào được phân tích
+                    {searchQuery || scoreFilter !== 'all' || priceFilter !== 'all'
+                      ? 'Không tìm thấy bất động sản phù hợp với bộ lọc'
+                      : 'Chưa có bất động sản nào được phân tích'}
                   </p>
                 </div>
               )}
