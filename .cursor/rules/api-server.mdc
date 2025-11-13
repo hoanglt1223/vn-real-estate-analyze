@@ -1,0 +1,83 @@
+---
+description: API routes, server patterns, and backend architecture guidelines
+globs: api/**/*.ts
+alwaysApply: false
+---
+# API Routes and Server Architecture
+
+- All api must compatitive with serverless vercel
+- Maximum api for vercel is 12 endpoint, try group all related endpoint to 1
+- The grouped api will have many methods and reconize by type or other field
+
+## Server Structure
+
+- **Entry point**: [api/index.ts](mdc:api/index.ts) - Express app setup and middleware
+- **Routes**: [api/routes.ts](mdc:api/routes.ts) - API endpoint definitions
+- **Database**: [api/db.ts](mdc:api/db.ts) - Database connection and queries
+- **Services**: `api/services/` - Business logic and external integrations
+
+## API Conventions
+
+- All API routes are prefixed with `/api`
+- Use RESTful conventions where appropriate
+- Return JSON responses with consistent error handling
+- Use proper HTTP status codes
+
+```typescript
+// ✅ Good API route pattern
+app.get("/api/lessons", async (req, res) => {
+  try {
+    const lessons = await db.select().from(lessonsTable);
+    res.json(lessons);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+```
+
+## Middleware
+
+- **Session management**: Express sessions configured in [api/index.ts](mdc:api/index.ts)
+- **Request logging**: Custom middleware for API request logging
+- **Error handling**: Global error handler for consistent error responses
+- **Body parsing**: JSON and URL-encoded body parsing
+
+## Authentication
+
+- Session-based authentication using express-session
+- Environment variable `VITE_SKIP_LOGIN` for development bypass
+- User authentication logic in routes and middleware
+
+## File Handling
+
+- **Upload directory**: `uploads/` for temporary file storage
+- **File processing**: [api/services/fileProcessor.ts](mdc:api/services/fileProcessor.ts)
+- **Storage**: Cloud storage integration via Google Cloud Storage
+
+## External Services
+
+- **OpenAI Integration**: [api/services/openai.ts](mdc:api/services/openai.ts)
+- **File Processing**: PDF extraction, DOCX parsing, image generation
+- **API Keys**: Managed through environment variables
+
+## Environment Configuration
+
+Required environment variables:
+- `DATABASE_URL`: PostgreSQL connection string
+- `SESSION_SECRET`: Session encryption secret
+- `OPENAI_API_KEY`: OpenAI API access
+- `GOOGLE_CLOUD_*`: Google Cloud Storage credentials
+
+## Error Handling
+
+- Use try-catch blocks in all async route handlers
+- Return meaningful error messages to the client
+- Log errors for debugging while keeping sensitive data secure
+- Use appropriate HTTP status codes (400, 401, 404, 500, etc.)
+
+## Database Queries
+
+- Use Drizzle ORM for all database operations
+- Import database connection from [api/db.ts](mdc:api/db.ts)
+- Use transactions for multi-table operations
+- Implement proper error handling for database operations

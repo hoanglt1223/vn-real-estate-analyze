@@ -1,0 +1,64 @@
+---
+globs: *.tsx,*.ts
+description: React and TypeScript coding standards and conventions
+---
+
+# React + TypeScript Coding Standards
+
+## Component Structure
+
+- Use functional components with TypeScript
+- Export components as default exports
+- Use PascalCase for component names
+- Place components in appropriate subdirectories under `client/src/components/`
+
+## Imports and Path Aliases
+
+- Use `@/` alias for client-side imports (maps to `client/src/`)
+- Use `@shared/` alias for shared types and schemas
+- Group imports: external libraries first, then internal imports
+- Use absolute imports over relative imports when possible
+
+```typescript
+// ✅ Good
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { User } from "@shared/schema";
+
+// ❌ Avoid
+import { Button } from "../../components/ui/button";
+```
+
+## Type Definitions
+
+- Import types from [shared/schema.ts](mdc:shared/schema.ts) for database entities
+- Use interface for props definitions
+- Prefer type inference when possible
+- Export types that may be reused
+
+```typescript
+interface ComponentProps {
+  user: User;
+  onUpdate: (data: Partial<User>) => void;
+}
+```
+
+## State Management
+
+- Use `useState` for local component state
+- Use React Query ([lib/queryClient.ts](mdc:client/src/lib/queryClient.ts)) for server state
+- Use Context ([contexts/AIContext.tsx](mdc:client/src/contexts/AIContext.tsx)) for global application state
+- Custom hooks should be in `client/src/hooks/` directory
+
+## Routing
+
+- Use `wouter` for client-side routing (already configured in [App.tsx](mdc:client/src/App.tsx))
+- Page components should be in `client/src/pages/`
+- Use Switch/Route pattern for route definitions
+
+## Error Handling
+
+- Use try-catch blocks in async functions
+- Display user-friendly error messages using toast notifications
+- Use React Query's error handling capabilities for API calls

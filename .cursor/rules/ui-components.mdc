@@ -1,0 +1,78 @@
+---
+globs: client/src/components/**/*.tsx,*.css
+description: UI components and styling guidelines using shadcn/ui and Tailwind CSS
+---
+
+# UI Components and Styling Guidelines
+
+## Component Library
+
+This project uses **shadcn/ui** components with **Tailwind CSS**. All UI components are located in `client/src/components/ui/`.
+
+## Styling System
+
+- **Tailwind CSS**: Primary styling framework configured in [tailwind.config.ts](mdc:tailwind.config.ts)
+- **CSS Variables**: Theme colors are defined using CSS custom properties
+- **Dark Mode**: Supported via class-based dark mode (`darkMode: ["class"]`)
+- **Animations**: Custom animations for accordions and other interactive elements
+
+## Component Structure
+
+```
+client/src/components/
+├── ui/           # shadcn/ui components (button, card, dialog, etc.)
+├── editor/       # Content editing components
+├── export/       # Export functionality components
+├── flashcards/   # Flashcard-specific components
+├── vocabulary/   # Vocabulary management components
+└── workflow/     # Workflow and kanban components
+```
+
+## Styling Best Practices
+
+- Use Tailwind utility classes for styling
+- Leverage CSS variables for theme consistency
+- Use `cn()` utility from [lib/utils.ts](mdc:client/src/lib/utils.ts) for conditional classes
+- Follow shadcn/ui patterns for component composition
+
+```typescript
+import { cn } from "@/lib/utils";
+
+// ✅ Good - using cn() for conditional classes
+<div className={cn(
+  "base-classes",
+  {
+    "conditional-class": condition,
+  },
+  className
+)} />
+```
+
+## Theme Colors
+
+The application uses a comprehensive color system defined in CSS variables:
+- `--background`, `--foreground`
+- `--card`, `--card-foreground`
+- `--primary`, `--primary-foreground`
+- `--secondary`, `--secondary-foreground`
+- `--muted`, `--muted-foreground`
+- `--accent`, `--accent-foreground`
+- `--destructive`, `--destructive-foreground`
+
+## Icon Usage
+
+- Use **Lucide React** icons consistently
+- Import only the icons you need
+- Use consistent sizing (typically `h-4 w-4`, `h-5 w-5`, or `h-6 w-6`)
+
+## Responsive Design
+
+- Use Tailwind's responsive prefixes (`sm:`, `md:`, `lg:`, `xl:`)
+- Test components on different screen sizes
+- Consider mobile-first design approach
+
+## Animation Guidelines
+
+- Use the built-in Tailwind animations where possible
+- Custom animations are defined in [tailwind.config.ts](mdc:tailwind.config.ts)
+- Keep animations subtle and performance-focused

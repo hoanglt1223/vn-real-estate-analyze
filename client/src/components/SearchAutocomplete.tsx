@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Loader2, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { API_ENDPOINTS } from '@/lib/api';
 
 interface VNSearchResult {
   name: string;
@@ -58,7 +59,7 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
 
     debounceTimer.current = setTimeout(async () => {
       try {
-        const response = await fetch(`/api/locations/search?q=${encodeURIComponent(query)}`);
+        const response = await fetch(API_ENDPOINTS.locationsSearch(query));
         
         if (!response.ok) {
           throw new Error(`Search API error: ${response.status}`);
@@ -95,7 +96,7 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
 
     try {
       // Geocode the selected location using TrackAsia
-      const response = await fetch('/api/locations/geocode', {
+      const response = await fetch(API_ENDPOINTS.locationsGeocode, {
         method: 'POST',
         body: JSON.stringify({ query: result.geocodeQuery }),
         headers: { 'Content-Type': 'application/json' }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { API_ENDPOINTS } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,16 +26,16 @@ export default function ManagementPage() {
   const [sortBy, setSortBy] = useState<string>('date');
 
   const { data: properties, isLoading } = useQuery<PropertyAnalysis[]>({
-    queryKey: ['/api/properties']
+    queryKey: [API_ENDPOINTS.propertiesList]
   });
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<PropertyAnalysis> }) => {
-      const res = await apiRequest('PUT', `/api/properties/${data.id}`, data.updates);
+      const res = await apiRequest('PUT', `${API_ENDPOINTS.propertiesUpdate(data.id)}`, data.updates);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.propertiesList] });
       setIsEditDialogOpen(false);
       setEditingProperty(null);
       toast({
@@ -53,11 +54,11 @@ export default function ManagementPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest('DELETE', `/api/properties/${id}`);
+      const res = await apiRequest('DELETE', `${API_ENDPOINTS.propertiesDelete(id)}`);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.propertiesList] });
       toast({
         title: 'Thành công',
         description: 'Đã xóa bất động sản'

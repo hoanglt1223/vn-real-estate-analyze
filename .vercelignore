@@ -1,0 +1,41 @@
+# Dependencies and build artifacts
+node_modules
+.pnpm-store
+dist
+.cache
+
+# Development files
+.env.local
+.env.development
+*.log
+.DS_Store
+
+# Documentation (but keep templates)
+docs/
+README.md
+*.md
+!client/public/templates/
+
+# Version control
+.git/
+.gitignore
+
+# Editor files
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# Testing
+coverage/
+*.test.*
+*.spec.*
+
+# Temporary files
+tmp/
+temp/
+uploads/
+
+# Lock files (keep pnpm-lock.yaml for reproducible builds)
+package-lock.json
+yarn.lock

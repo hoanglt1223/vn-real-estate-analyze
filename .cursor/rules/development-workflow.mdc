@@ -1,0 +1,62 @@
+---
+alwaysApply: true
+---
+
+# Development Workflow and Tooling
+
+## Available Scripts
+
+From [package.json](mdc:package.json):
+
+- `pnpm run dev` - Start development server with hot reload
+- `pnpm run build` - Build production bundle (client + server)  
+- `pnpm run build:vercel` - Build for Vercel deployment
+- `pnpm run start` - Start production server
+- `pnpm run start:serverless` - Start in serverless mode
+- `pnpm run check` - TypeScript type checking
+- `pnpm run type-check` - TypeScript type checking without emit
+
+## Development Setup
+
+1. **Environment**: Copy environment variables for OpenAI and DeepL API keys
+2. **Dependencies**: Run `pnpm install` to install all dependencies
+3. **Development**: Use `pnpm run dev` for hot-reload development
+4. **Storage**: Data is stored in filesystem (no database required)
+
+## Key Technologies
+
+- **Frontend**: React 18 + TypeScript + Vite
+- **Backend**: Express.js + TypeScript
+- **Storage**: Filesystem-based JSON storage
+- **Styling**: Tailwind CSS + shadcn/ui
+- **State Management**: React Query + Context API
+- **Routing**: wouter (lightweight React router)
+- **Forms**: React Hook Form + Zod validation
+- **AI Integration**: OpenAI API for lesson plan generation
+
+## File Organization Principles
+
+- **Separation of concerns**: Client, server, and shared code in separate directories
+- **Feature-based organization**: Group related components together
+- **Reusable components**: UI components in `client/src/components/ui/`
+- **Business logic**: Keep complex logic in custom hooks and services
+
+## Build and Deployment
+
+- **Development**: Vite dev server with Express API proxy
+- **Production**: Static client build with serverless API functions
+- **Deployment**: Vercel serverless deployment with filesystem storage
+- **Environment**: Uses `NODE_ENV` to switch between development and production modes
+
+## Code Quality
+
+- TypeScript strict mode enabled
+- Path aliases configured for clean imports
+- ESM modules throughout the project
+- Consistent error handling patterns
+
+## External Integrations
+
+- **OpenAI**: For AI-powered lesson plan and flashcard generation
+- **PDF/DOCX processing**: For document parsing and generation
+- **Filesystem Storage**: JSON-based data persistence for serverless deployment

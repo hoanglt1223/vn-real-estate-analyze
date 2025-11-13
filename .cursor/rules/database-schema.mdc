@@ -1,0 +1,66 @@
+---
+globs: shared/schema.ts,server/db.ts,drizzle.config.ts
+description: Database schema management with Drizzle ORM
+---
+
+# Database Schema and ORM Patterns
+
+## Schema Definition
+
+All database schemas are defined in [shared/schema.ts](mdc:shared/schema.ts) using Drizzle ORM.
+
+## Core Tables
+
+- **users**: User authentication and credit management
+- **lessons**: Main lesson plans with workflow status
+- **workflows**: Workflow state management for lesson creation
+
+## Schema Patterns
+
+- Use `varchar("id").primaryKey().default(sql'gen_random_uuid()')` for primary keys
+- Use `timestamp` fields with `defaultNow()` for created/updated tracking
+- Use `jsonb` for complex nested data structures
+- Use Zod schemas for validation (`createInsertSchema` from drizzle-zod)
+
+```typescript
+// ✅ Standard table pattern
+export const tableName = pgTable("table_name", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // ... other fields
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+```
+
+## Type Generation
+
+- Export both insert and select types for each table
+- Use `createInsertSchema` for validation schemas
+- Export TypeScript types for use across the application
+
+```typescript
+export const insertSchemaName = createInsertSchema(tableName).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertType = z.infer<typeof insertSchemaName>;
+export type SelectType = typeof tableName.$inferSelect;
+```
+
+## Database Configuration
+
+- Database connection is configured in [server/db.ts](mdc:server/db.ts)
+- Migrations are managed through [drizzle.config.ts](mdc:drizzle.config.ts)
+- Use `npm run db:push` to push schema changes to development database
+
+## JSON Fields
+
+For complex data structures, use the `$type<>()` modifier to provide TypeScript types:
+
+```typescript
+complexField: jsonb("complex_field").$type<ComplexType>()
+```
+
+This pattern is used for lesson flashcards, AI analysis data, and workflow step data.

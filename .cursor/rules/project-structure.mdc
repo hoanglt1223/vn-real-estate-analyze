@@ -1,0 +1,46 @@
+---
+alwaysApply: true
+---
+
+# VN Real Estate Analyze Project Structure
+
+This is a full-stack TypeScript application for analyzing real estate data with AI assistance.
+DO NOT USE MOCK API/INTEGRATE
+All commands need support by Windows 10, PowerShell (don't use &&, replace with ;)
+JUST IMPLEMENT DO NOT RUN TEST, CREATE TEST PLAN WHEN ALL FINISH
+DO NOT DELAY TOO LONG IN WAIT TOOL CALL
+Implement AS SIMPLE AS POSIBLE, DO NTO ADD MANY NEW CODES, NEW LAYERS, TRY FIX/UPDATE
+FOR FIX BUGS TASK, PLEASE MADE SMALLEST CHANGES
+DO NOT REMOVE GPT-5-nano
+
+## Project Architecture
+
+- **Frontend**: React + TypeScript + Vite located in `client/`
+- **Backend**: Express.js + TypeScript located in `server/`
+- **Shared**: Common types and schemas in `shared/`
+- **Database**: PostgreSQL with Drizzle ORM
+
+## Key Entry Points
+
+- **Client entry**: [client/src/main.tsx](mdc:client/src/main.tsx)
+- **Server entry**: [server/index.ts](mdc:server/index.ts)
+- **App component**: [client/src/App.tsx](mdc:client/src/App.tsx)
+- **Database schema**: [shared/schema.ts](mdc:shared/schema.ts)
+- **API routes**: [server/routes.ts](mdc:server/routes.ts)
+
+## Configuration Files
+
+- **TypeScript**: [tsconfig.json](mdc:tsconfig.json) with path aliases (`@/*` for client, `@shared/*` for shared)
+- **Tailwind**: [tailwind.config.ts](mdc:tailwind.config.ts) for styling configuration
+- **Drizzle**: [drizzle.config.ts](mdc:drizzle.config.ts) for database migrations
+- **Package management**: [package.json](mdc:package.json) with scripts for dev, build, and database operations
+
+## Core Features
+
+The application provides a workflow for:
+1. File upload and AI analysis
+2. Lesson plan generation
+3. Flashcard creation
+4. Summary generation
+
+Key components are organized in `client/src/components/` with UI components from shadcn/ui in `client/src/components/ui/`.
