@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import Header from '@/components/Header';
 import MapView from '@/components/MapView';
 import PropertyInputPanel from '@/components/PropertyInputPanel';
 import AmenitiesFilter from '@/components/AmenitiesFilter';
@@ -33,6 +32,21 @@ export default function AnalysisPage() {
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [shouldAutoAnalyze, setShouldAutoAnalyze] = useState(false);
 
+  const handleRadiusChange = (newRadius: number) => {
+    setRadius(newRadius);
+    setShouldAutoAnalyze(true);
+  };
+
+  const handleCategoryChange = (categories: string[]) => {
+    setSelectedCategories(categories);
+    setShouldAutoAnalyze(true);
+  };
+
+  const handleLayerChange = (layers: string[]) => {
+    setSelectedLayers(layers);
+    setShouldAutoAnalyze(true);
+  };
+
   useEffect(() => {
     if (shouldAutoAnalyze && propertyData.area > 0 && propertyData.coordinates.length > 0) {
       const timer = setTimeout(() => {
@@ -41,7 +55,7 @@ export default function AnalysisPage() {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [radius, selectedCategories, selectedLayers, shouldAutoAnalyze]);
+  }, [radius, selectedCategories, selectedLayers, shouldAutoAnalyze, propertyData]);
 
   const handlePolygonChange = (data: any) => {
     setPropertyData({
@@ -126,7 +140,18 @@ export default function AnalysisPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      <Header onExportPDF={handleExportPDF} />
+      <div className="border-b bg-background p-2 flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Phân Tích Bất Động Sản</h1>
+        <Button
+          onClick={handleExportPDF}
+          disabled={!analysisResults}
+          variant="secondary"
+          size="sm"
+          data-testid="button-export-pdf"
+        >
+          Xuất PDF
+        </Button>
+      </div>
       
       <div className="flex-1 flex overflow-hidden">
         <div className="hidden lg:block w-80 xl:w-96 border-r bg-background">
@@ -141,14 +166,14 @@ export default function AnalysisPage() {
               
               <AmenitiesFilter
                 radius={radius}
-                onRadiusChange={setRadius}
+                onRadiusChange={handleRadiusChange}
                 selectedCategories={selectedCategories}
-                onCategoryChange={setSelectedCategories}
+                onCategoryChange={handleCategoryChange}
               />
 
               <InfrastructureLayer
                 selectedLayers={selectedLayers}
-                onLayerChange={setSelectedLayers}
+                onLayerChange={handleLayerChange}
               />
 
               {analysisResults && (

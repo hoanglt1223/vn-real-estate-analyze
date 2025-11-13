@@ -29,6 +29,10 @@ export const propertyAnalyses = pgTable("property_analyses", {
   marketData: jsonb("market_data").$type<any>(),
   aiAnalysis: jsonb("ai_analysis").$type<any>(),
   risks: jsonb("risks").$type<any[]>(),
+  propertyType: text("property_type"),
+  valuation: integer("valuation"),
+  askingPrice: integer("asking_price"),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -37,7 +41,12 @@ export const insertPropertyAnalysisSchema = createInsertSchema(propertyAnalyses)
   createdAt: true,
 });
 
+export const updatePropertyAnalysisSchema = insertPropertyAnalysisSchema.partial().extend({
+  id: z.string()
+});
+
 export type InsertPropertyAnalysis = z.infer<typeof insertPropertyAnalysisSchema>;
+export type UpdatePropertyAnalysis = z.infer<typeof updatePropertyAnalysisSchema>;
 export type PropertyAnalysis = typeof propertyAnalyses.$inferSelect;
 
 export const amenitiesCache = pgTable("amenities_cache", {

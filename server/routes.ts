@@ -112,6 +112,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/properties", async (req, res) => {
+    try {
+      const properties = await storage.listPropertyAnalyses();
+      res.json(properties);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/properties/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateSchema = z.object({
+        propertyType: z.string().optional(),
+        valuation: z.number().optional().nullable(),
+        askingPrice: z.number().optional().nullable(),
+        notes: z.string().optional().nullable()
+      });
+      
+      const parseResult = updateSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: 'Invalid request data',
+          details: parseResult.error.issues 
+        });
+      }
+
+      const validatedData = parseResult.data;
+      const cleanedData = Object.fromEntries(
+        Object.entries(validatedData).filter(([_, v]) => v !== undefined)
+      );
+      
+      const updated = await storage.updatePropertyAnalysis(id, cleanedData);
+      if (!updated) {
+        return res.status(404).json({ error: 'Property not found' });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/properties/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deletePropertyAnalysis(id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Property not found' });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
