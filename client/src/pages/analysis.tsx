@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import MapView from '@/components/MapView';
 import PropertyInputPanel from '@/components/PropertyInputPanel';
 import AmenitiesFilter from '@/components/AmenitiesFilter';
 import AmenityList from '@/components/AmenityList';
+import AmenityStatistics from '@/components/AmenityStatistics';
 import MarketPriceCard from '@/components/MarketPriceCard';
 import AIAnalysisCard from '@/components/AIAnalysisCard';
 import RiskAssessmentCard from '@/components/RiskAssessmentCard';
@@ -30,6 +31,17 @@ export default function AnalysisPage() {
   const [selectedLayers, setSelectedLayers] = useState(['roads', 'metro']);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [shouldAutoAnalyze, setShouldAutoAnalyze] = useState(false);
+
+  useEffect(() => {
+    if (shouldAutoAnalyze && propertyData.area > 0 && propertyData.coordinates.length > 0) {
+      const timer = setTimeout(() => {
+        handleAnalyze();
+        setShouldAutoAnalyze(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [radius, selectedCategories, selectedLayers, shouldAutoAnalyze]);
 
   const handlePolygonChange = (data: any) => {
     setPropertyData({
@@ -139,6 +151,10 @@ export default function AnalysisPage() {
                 onLayerChange={setSelectedLayers}
               />
 
+              {analysisResults && (
+                <AmenityStatistics amenities={analysisResults.amenities || []} />
+              )}
+
               {propertyData.area > 0 && (
                 <Button
                   onClick={handleAnalyze}
@@ -216,6 +232,7 @@ export default function AnalysisPage() {
                   summary={analysisResults.aiAnalysis.summary}
                 />
                 <MarketPriceCard data={analysisResults.marketData} />
+                <AmenityStatistics amenities={analysisResults.amenities || []} />
                 <AmenityList amenities={analysisResults.amenities} />
                 <RiskAssessmentCard risks={analysisResults.risks} overallRiskLevel={analysisResults.overallRiskLevel} />
               </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import * as turf from '@turf/turf';
+import SearchAutocomplete from './SearchAutocomplete';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
 
@@ -65,6 +66,69 @@ export default function MapView({
   const radiusSourceRef = useRef<string>('radius-circle');
   const [currentCenter, setCurrentCenter] = useState<{ lat: number; lng: number } | null>(null);
 
+  function getOrientation(bearing: number): string {
+    const normalized = ((bearing + 360) % 360);
+    if (normalized >= 337.5 || normalized < 22.5) return 'Bắc';
+    if (normalized >= 22.5 && normalized < 67.5) return 'Đông Bắc';
+    if (normalized >= 67.5 && normalized < 112.5) return 'Đông';
+    if (normalized >= 112.5 && normalized < 157.5) return 'Đông Nam';
+    if (normalized >= 157.5 && normalized < 202.5) return 'Nam';
+    if (normalized >= 202.5 && normalized < 247.5) return 'Tây Nam';
+    if (normalized >= 247.5 && normalized < 292.5) return 'Tây';
+    return 'Tây Bắc';
+  }
+
+  const handleSearchSelect = (result: any) => {
+    if (!map.current || !draw.current) return;
+
+    const [lng, lat] = result.center;
+    
+    map.current.flyTo({ 
+      center: [lng, lat], 
+      zoom: 16,
+      duration: 1500
+    });
+
+    const size = 0.0005;
+    const polygon = [
+      [lng - size, lat - size],
+      [lng + size, lat - size],
+      [lng + size, lat + size],
+      [lng - size, lat + size],
+      [lng - size, lat - size]
+    ];
+
+    draw.current.deleteAll();
+    const feature = {
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [polygon]
+      },
+      properties: {},
+      id: undefined
+    };
+    draw.current.add(feature as any);
+
+    const turfPolygon = turf.polygon([polygon]);
+    const area = turf.area(turfPolygon);
+    const bearing = turf.bearing(
+      turf.point(polygon[0]),
+      turf.point(polygon[1])
+    );
+    const orientation = getOrientation(bearing);
+    
+    setCurrentCenter({ lat, lng });
+    
+    onPolygonChange?.({
+      coordinates: polygon,
+      area: Math.round(area),
+      orientation,
+      frontageCount: 4,
+      center: { lat, lng }
+    });
+  };
+
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -86,56 +150,6 @@ export default function MapView({
     map.current.addControl(draw.current);
     map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
     map.current.addControl(new mapboxgl.FullscreenControl(), 'bottom-right');
-
-    const geocoderContainer = document.createElement('div');
-    geocoderContainer.className = 'mapboxgl-ctrl';
-    geocoderContainer.style.position = 'absolute';
-    geocoderContainer.style.top = '10px';
-    geocoderContainer.style.left = '10px';
-    geocoderContainer.style.zIndex = '1';
-    geocoderContainer.innerHTML = `
-      <div style="background:white;padding:8px;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,0.1);display:flex;align-items:center;gap:8px;">
-        <input 
-          type="text" 
-          placeholder="Tìm kiếm địa chỉ tại Việt Nam..." 
-          id="geocoder-search"
-          style="border:1px solid #ddd;padding:6px 12px;border-radius:4px;width:300px;font-size:14px;outline:none;"
-        />
-        <button 
-          id="geocoder-btn"
-          style="background:#3B82F6;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:14px;"
-        >Tìm</button>
-      </div>
-    `;
-    
-    const searchInput = geocoderContainer.querySelector('#geocoder-search') as HTMLInputElement;
-    const searchBtn = geocoderContainer.querySelector('#geocoder-btn') as HTMLButtonElement;
-    
-    const performSearch = async () => {
-      const query = searchInput.value.trim();
-      if (!query) return;
-      
-      try {
-        const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=vn&access_token=${mapboxgl.accessToken}`
-        );
-        const data = await response.json();
-        
-        if (data.features && data.features.length > 0) {
-          const [lng, lat] = data.features[0].center;
-          map.current?.flyTo({ center: [lng, lat], zoom: 15 });
-        }
-      } catch (error) {
-        console.error('Geocoding error:', error);
-      }
-    };
-    
-    searchBtn.addEventListener('click', performSearch);
-    searchInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') performSearch();
-    });
-    
-    mapContainer.current?.appendChild(geocoderContainer);
 
     const layerControl = document.createElement('div');
     layerControl.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
@@ -325,19 +339,12 @@ export default function MapView({
     });
   }, [amenities, selectedCategories, isLoaded]);
 
-  function getOrientation(bearing: number): string {
-    const normalized = ((bearing + 360) % 360);
-    if (normalized >= 337.5 || normalized < 22.5) return 'Bắc';
-    if (normalized >= 22.5 && normalized < 67.5) return 'Đông Bắc';
-    if (normalized >= 67.5 && normalized < 112.5) return 'Đông';
-    if (normalized >= 112.5 && normalized < 157.5) return 'Đông Nam';
-    if (normalized >= 157.5 && normalized < 202.5) return 'Nam';
-    if (normalized >= 202.5 && normalized < 247.5) return 'Tây Nam';
-    if (normalized >= 247.5 && normalized < 292.5) return 'Tây';
-    return 'Tây Bắc';
-  }
-
   return (
-    <div ref={mapContainer} className="w-full h-full" data-testid="map-container" />
+    <div className="relative w-full h-full">
+      <div ref={mapContainer} className="w-full h-full" data-testid="map-container" />
+      <div className="absolute top-4 left-4 z-10">
+        <SearchAutocomplete onSelect={handleSearchSelect} />
+      </div>
+    </div>
   );
 }
