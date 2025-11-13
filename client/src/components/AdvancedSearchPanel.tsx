@@ -99,6 +99,7 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
   };
 
   return (
+    <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
     <Card className="mb-6">
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -119,7 +120,7 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
               Xóa
             </Button>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}>
+              <Button variant="ghost" size="sm">
                 {isAdvancedOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </Button>
             </CollapsibleTrigger>
@@ -186,7 +187,6 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
           </div>
         </div>
 
-        <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
           <CollapsibleContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
               <div>
@@ -266,7 +266,6 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
               </div>
             </div>
           </CollapsibleContent>
-        </Collapsible>
 
         <div className="mt-4 flex gap-2">
           <Button onClick={handleSearch} className="flex-1">
@@ -280,5 +279,6 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
         </div>
       </CardContent>
     </Card>
+    </Collapsible>
   );
 }
