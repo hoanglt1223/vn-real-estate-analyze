@@ -94,15 +94,96 @@ export async function scrapeMarketPrices(
 }
 
 async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Promise<{ listings: PriceListing[] }> {
-  // TODO: Implement real API integration with Batdongsan.com.vn
-  // Note: Direct scraping is blocked by Cloudflare (403)
-  // Options:
-  // 1. Use official API if available
-  // 2. Partner program for data access
-  // 3. Use alternative data sources
+  const APIFY_TOKEN = process.env.APIFY_API_KEY;
   
-  console.log('Batdongsan API not implemented yet - using mock data');
-  return generateMockListings('batdongsan', lat, lng, radius, 15);
+  if (!APIFY_TOKEN) {
+    console.log('APIFY_API_KEY not found - using mock data');
+    return generateMockListings('batdongsan', lat, lng, radius, 15);
+  }
+
+  try {
+    console.log('Fetching real data from Batdongsan via Apify scraper...');
+    
+    // Start Apify actor run
+    const runResponse = await fetch(
+      'https://api.apify.com/v2/acts/minhlucvan~batdongsan-scraper/runs',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${APIFY_TOKEN}`
+        },
+        body: JSON.stringify({
+          startUrls: [{
+            url: `https://batdongsan.com.vn/nha-dat-ban/tp-hcm`
+          }],
+          maxItems: 30,
+          proxyConfiguration: {
+            useApifyProxy: true
+          }
+        })
+      }
+    );
+
+    if (!runResponse.ok) {
+      throw new Error(`Apify API error: ${runResponse.status}`);
+    }
+
+    const run = await runResponse.json();
+    const datasetId = run.data.defaultDatasetId;
+
+    // Poll for completion (max 30 seconds)
+    let attempts = 0;
+    const maxAttempts = 15;
+    
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const statusResponse = await fetch(
+        `https://api.apify.com/v2/acts/minhlucvan~batdongsan-scraper/runs/${run.data.id}`,
+        {
+          headers: { 'Authorization': `Bearer ${APIFY_TOKEN}` }
+        }
+      );
+      
+      const status = await statusResponse.json();
+      
+      if (status.data.status === 'SUCCEEDED') {
+        break;
+      } else if (status.data.status === 'FAILED' || status.data.status === 'ABORTED') {
+        throw new Error(`Apify run ${status.data.status}`);
+      }
+      
+      attempts++;
+    }
+
+    // Fetch results from dataset
+    const dataResponse = await fetch(
+      `https://api.apify.com/v2/datasets/${datasetId}/items`,
+      {
+        headers: { 'Authorization': `Bearer ${APIFY_TOKEN}` }
+      }
+    );
+
+    if (!dataResponse.ok) {
+      throw new Error(`Failed to fetch dataset: ${dataResponse.status}`);
+    }
+
+    const items = await dataResponse.json();
+    
+    if (!items || items.length === 0) {
+      console.log('No items returned from Apify - using mock data');
+      return generateMockListings('batdongsan', lat, lng, radius, 15);
+    }
+
+    console.log(`Successfully fetched ${items.length} listings from Batdongsan via Apify`);
+    return parseApifyResults(items, lat, lng, radius);
+    
+  } catch (error) {
+    console.error('Apify scraper error:', error);
+    console.log('Falling back to mock data');
+    return generateMockListings('batdongsan', lat, lng, radius, 15);
+  }
 }
 
 async function fetchFromChotot(lat: number, lng: number, radius: number): Promise<{ listings: PriceListing[] }> {
@@ -111,6 +192,67 @@ async function fetchFromChotot(lat: number, lng: number, radius: number): Promis
   
   console.log('Chotot API not implemented yet - using mock data');
   return generateMockListings('chotot', lat, lng, radius, 10);
+}
+
+function parseApifyResults(items: any[], lat: number, lng: number, radius: number): { listings: PriceListing[] } {
+  const listings: PriceListing[] = [];
+  
+  for (const item of items) {
+    try {
+      // Parse price (could be in different formats)
+      let price = 0;
+      if (item.price) {
+        // Remove non-numeric characters except decimal point
+        const priceStr = String(item.price).replace(/[^\d.]/g, '');
+        price = parseFloat(priceStr);
+        
+        // Convert to VND if needed (Apify might return in billions/millions)
+        if (price < 1000) {
+          price = price * 1000000000; // Assume billions if < 1000
+        } else if (price < 100000) {
+          price = price * 1000000; // Assume millions if < 100k
+        }
+      }
+      
+      // Parse area
+      let area = item.area || item.size || 100;
+      if (typeof area === 'string') {
+        area = parseFloat(area.replace(/[^\d.]/g, '')) || 100;
+      }
+      
+      // Calculate price per sqm
+      const pricePerSqm = area > 0 ? Math.round(price / area) : 0;
+      
+      // Parse address
+      const address = item.address || item.location || item.title || 'TP.HCM';
+      
+      // Parse posted date
+      let postedDate = new Date();
+      if (item.postedDate || item.publishedDate || item.createdAt) {
+        postedDate = new Date(item.postedDate || item.publishedDate || item.createdAt);
+      }
+      
+      // Only include listings with valid price and area
+      if (price > 0 && area > 0) {
+        listings.push({
+          id: item.id || `apify-${Date.now()}-${Math.random()}`,
+          price: Math.round(price),
+          pricePerSqm,
+          area: Math.round(area),
+          address,
+          source: 'Batdongsan.com.vn',
+          url: item.url || item.link || `https://batdongsan.com.vn`,
+          postedDate
+        });
+      }
+    } catch (error) {
+      console.error('Error parsing Apify item:', error);
+      continue;
+    }
+  }
+  
+  // If no valid listings parsed, return empty (will fallback to mock)
+  return { listings };
 }
 
 function generateMockListings(source: string, lat: number, lng: number, radius: number, count: number): { listings: PriceListing[] } {
