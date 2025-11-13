@@ -102,7 +102,7 @@ export async function fetchAmenities(
           walkTime: Math.round(distance / 80),
           lat: elementLat,
           lng: elementLng,
-          type: element.tags?.amenity || element.tags?.shop || element.tags?.leisure
+          type: element.tags?.aeroway || element.tags?.railway || element.tags?.amenity || element.tags?.shop || element.tags?.leisure || element.tags?.highway
         });
       }
     } catch (error) {

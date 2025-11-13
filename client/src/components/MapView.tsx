@@ -13,6 +13,7 @@ interface Amenity {
   lat: number;
   lng: number;
   distance?: number;
+  type?: string;
 }
 
 interface MapViewProps {
@@ -50,6 +51,14 @@ const categoryIcons: Record<string, string> = {
   default: '📍'
 };
 
+const transportTypeIcons: Record<string, string> = {
+  aerodrome: '✈️',
+  station: '🚉',
+  bus_station: '🚌',
+  bus_stop: '🚏',
+  default: '🚉'
+};
+
 const categoryVietnamese: Record<string, string> = {
   education: 'Giáo dục',
   healthcare: 'Y tế',
@@ -73,6 +82,7 @@ export default function MapView({
   const map = useRef<mapboxgl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [styleLoaded, setStyleLoaded] = useState(0);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const radiusSourceRef = useRef<string>('radius-circle');
   const [currentCenter, setCurrentCenter] = useState<{ lat: number; lng: number } | null>(null);
@@ -161,21 +171,39 @@ export default function MapView({
     map.current.addControl(draw.current);
     map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
     map.current.addControl(new mapboxgl.FullscreenControl(), 'bottom-right');
+    map.current.addControl(new mapboxgl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true
+      },
+      trackUserLocation: true,
+      showUserHeading: true
+    }), 'bottom-right');
 
     const layerControl = document.createElement('div');
     layerControl.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
     layerControl.innerHTML = `
-      <button data-layer="streets" title="Streets" style="width:29px;height:29px;border:none;background:#fff;cursor:pointer;">🗺️</button>
-      <button data-layer="satellite" title="Satellite" style="width:29px;height:29px;border:none;background:#fff;cursor:pointer;border-top:1px solid #ddd;">🛰️</button>
+      <button data-layer="streets" title="Đường phố" style="width:29px;height:29px;border:none;background:#fff;cursor:pointer;font-size:14px;">🗺️</button>
+      <button data-layer="light" title="Sáng (Tối giản)" style="width:29px;height:29px;border:none;background:#fff;cursor:pointer;border-top:1px solid #ddd;font-size:14px;">☀️</button>
+      <button data-layer="dark" title="Tối" style="width:29px;height:29px;border:none;background:#fff;cursor:pointer;border-top:1px solid #ddd;font-size:14px;">🌙</button>
+      <button data-layer="outdoors" title="Ngoài trời" style="width:29px;height:29px;border:none;background:#fff;cursor:pointer;border-top:1px solid #ddd;font-size:14px;">🏔️</button>
+      <button data-layer="satellite" title="Vệ tinh" style="width:29px;height:29px;border:none;background:#fff;cursor:pointer;border-top:1px solid #ddd;font-size:14px;">🛰️</button>
+      <button data-layer="navigation" title="Điều hướng" style="width:29px;height:29px;border:none;background:#fff;cursor:pointer;border-top:1px solid #ddd;font-size:14px;">🧭</button>
     `;
+    
+    const mapStyles: Record<string, string> = {
+      streets: 'mapbox://styles/mapbox/streets-v12',
+      light: 'mapbox://styles/mapbox/light-v11',
+      dark: 'mapbox://styles/mapbox/dark-v11',
+      outdoors: 'mapbox://styles/mapbox/outdoors-v12',
+      satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+      navigation: 'mapbox://styles/mapbox/navigation-day-v1'
+    };
     
     layerControl.querySelectorAll('button').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const layer = (e.target as HTMLButtonElement).dataset.layer;
-        if (layer === 'satellite') {
-          map.current?.setStyle('mapbox://styles/mapbox/satellite-streets-v12');
-        } else {
-          map.current?.setStyle('mapbox://styles/mapbox/streets-v12');
+        if (layer && mapStyles[layer]) {
+          map.current?.setStyle(mapStyles[layer]);
         }
       });
     });
@@ -246,6 +274,13 @@ export default function MapView({
 
     map.current.on('style.load', () => {
       addRadiusLayers();
+      if (draw.current) {
+        const data = draw.current.getAll();
+        if (data.features.length > 0) {
+          updatePolygon();
+        }
+      }
+      setStyleLoaded(prev => prev + 1);
     });
 
     map.current.on('draw.create', updatePolygon);
@@ -319,6 +354,9 @@ export default function MapView({
     try {
       infraLayers.forEach(layerId => {
         if (map.current?.getLayer(layerId)) {
+          map.current.off('click', layerId);
+          map.current.off('mouseenter', layerId);
+          map.current.off('mouseleave', layerId);
           map.current.removeLayer(layerId);
         }
       });
@@ -447,7 +485,7 @@ export default function MapView({
         });
       }
     });
-  }, [infrastructure, selectedLayers, isLoaded]);
+  }, [infrastructure, selectedLayers, isLoaded, styleLoaded]);
 
   useEffect(() => {
     if (!map.current || !isLoaded) return;
@@ -474,7 +512,12 @@ export default function MapView({
       el.style.cursor = 'pointer';
       el.style.border = '2px solid white';
       el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-      el.textContent = categoryIcons[amenity.category] || categoryIcons.default;
+      
+      let icon = categoryIcons[amenity.category] || categoryIcons.default;
+      if (amenity.category === 'transport' && amenity.type) {
+        icon = transportTypeIcons[amenity.type] || transportTypeIcons.default;
+      }
+      el.textContent = icon;
 
       const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
         <div style="padding:8px;">
@@ -495,13 +538,21 @@ export default function MapView({
 
       markersRef.current.push(marker);
     });
-  }, [amenities, selectedCategories, isLoaded]);
+  }, [amenities, selectedCategories, isLoaded, styleLoaded]);
 
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="w-full h-full" data-testid="map-container" />
       <div className="absolute top-4 left-4 z-10">
         <SearchAutocomplete onSelect={handleSearchSelect} />
+      </div>
+      <div className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm max-w-xs">
+        <p className="font-semibold text-gray-800 mb-1">💡 Hướng dẫn vẽ khu đất:</p>
+        <p className="text-gray-600 text-xs">
+          1. Click vào icon <span className="inline-block w-6 h-6 align-middle">📐</span> ở góc trên bản đồ<br/>
+          2. Click lần lượt để đánh dấu các góc khu đất<br/>
+          3. Click vào điểm đầu tiên để hoàn thành polygon
+        </p>
       </div>
     </div>
   );

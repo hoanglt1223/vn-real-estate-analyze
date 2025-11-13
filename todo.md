@@ -85,6 +85,31 @@
 
 ---
 
+## 🔵 NEW FEATURES - Tính năng mới đề xuất
+
+### 13. Xuất Báo Cáo Chi Tiết
+- [ ] Xuất PDF báo cáo đầy đủ với tất cả thông tin phân tích
+- [ ] Bao gồm map screenshot theo filter hiện tại
+- [ ] Charts và graphs cho market data
+- [ ] Danh sách đầy đủ tất cả tiện ích xung quanh
+- [ ] AI recommendations chi tiết
+- [ ] Risk assessment với visualization
+
+### 14. Xuất Bản Đồ Theo Filter
+- [ ] Export PNG/JPG của map với filter hiện tại
+- [ ] Bao gồm tất cả markers visible
+- [ ] Bao gồm infrastructure overlays được chọn
+- [ ] Có legend cho các layers
+- [ ] High resolution cho print quality
+
+### 15. Hướng Dẫn Polygon Drawing
+- [ ] Tooltip hướng dẫn cách vẽ polygon
+- [ ] "Click để bắt đầu vẽ, click vào điểm đầu tiên để hoàn thành"
+- [ ] Visual feedback khi đang vẽ
+- [ ] Nút "Hoàn thành" rõ ràng hoặc hướng dẫn double-click
+
+---
+
 ## 📋 DONE - Đã hoàn thành
 
 - [x] Basic map với Mapbox GL
@@ -93,10 +118,14 @@
 - [x] Backend API routes
 - [x] OpenAI integration
 - [x] Basic PDF export
-- [x] Geocoding search (cần autocomplete)
-- [x] Satellite/streets layer toggle
-- [x] Basic amenity markers (cần real data)
+- [x] Geocoding search với autocomplete
+- [x] Multiple map styles (Streets, Light, Dark, Outdoors, Satellite, Navigation)
+- [x] Basic amenity markers với real data
 - [x] Radius circle visualization
+- [x] Transport amenities (Sân bay, Nhà ga, Bến xe buýt)
+- [x] Infrastructure overlays (Bus routes, Metro lines)
+- [x] Geolocation control (Định vị vị trí hiện tại)
+- [x] Icon riêng cho từng loại transport (✈️ sân bay, 🚉 nhà ga, 🚌 bến xe, 🚏 trạm xe buýt)
 
 ---
 
