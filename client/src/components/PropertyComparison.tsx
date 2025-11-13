@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { Compare, Plus, X, Check, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ArrowLeftRight, Plus, X, Check, TrendingUp, TrendingDown, Minus, GitCompare } from 'lucide-react';
 import type { PropertyAnalysis } from '@shared/schema';
 import { createPropertyComparison } from '@/lib/api';
 
@@ -172,7 +172,7 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Compare className="w-5 h-5" />
+            <GitCompare className="w-5 h-5" />
             So sánh Bất động sản
             {selectedProperties.length > 0 && (
               <Badge variant="secondary">{selectedProperties.length} đã chọn</Badge>
@@ -245,7 +245,7 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
           <DialogContent className="max-w-6xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Compare className="w-5 h-5" />
+                <ArrowLeftRight className="w-5 h-5" />
                 So sánh Chi tiết Bất động sản
               </DialogTitle>
             </DialogHeader>
