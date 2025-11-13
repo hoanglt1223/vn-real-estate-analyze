@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Play } from 'lucide-react';
 import { analyzeProperty } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { generatePDF } from '@/lib/pdfExport';
 
 export default function AnalysisPage() {
   const { toast } = useToast();
@@ -21,7 +22,8 @@ export default function AnalysisPage() {
     area: 0,
     orientation: '',
     frontageCount: 0,
-    coordinates: [] as number[][]
+    coordinates: [] as number[][],
+    center: { lat: 0, lng: 0 }
   });
   const [radius, setRadius] = useState(1000);
   const [selectedCategories, setSelectedCategories] = useState(['education', 'healthcare']);
@@ -34,7 +36,8 @@ export default function AnalysisPage() {
       area: data.area,
       orientation: data.orientation,
       frontageCount: data.frontageCount,
-      coordinates: data.coordinates
+      coordinates: data.coordinates,
+      center: data.center
     });
   };
 
@@ -75,9 +78,38 @@ export default function AnalysisPage() {
     }
   };
 
-  const handleExportPDF = () => {
-    console.log('Exporting PDF report...');
-    //todo: implement PDF export functionality
+  const handleExportPDF = async () => {
+    if (!analysisResults) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng phân tích khu đất trước khi xuất báo cáo',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      toast({
+        title: 'Đang xuất PDF...',
+        description: 'Vui lòng đợi trong giây lát'
+      });
+
+      await generatePDF({
+        propertyData,
+        analysisResults
+      });
+
+      toast({
+        title: 'Thành công',
+        description: 'Đã xuất báo cáo PDF thành công'
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi xuất PDF',
+        description: error.message || 'Không thể xuất báo cáo PDF',
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -135,6 +167,11 @@ export default function AnalysisPage() {
               center={[106.6297, 10.8231]}
               zoom={12}
               onPolygonChange={handlePolygonChange}
+              amenities={analysisResults?.amenities || []}
+              radius={radius}
+              selectedCategories={selectedCategories}
+              selectedLayers={selectedLayers}
+              infrastructure={analysisResults?.infrastructure}
             />
           </div>
 
