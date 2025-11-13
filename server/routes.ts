@@ -6,7 +6,7 @@ import { fetchAmenities, fetchInfrastructure } from "./services/overpass";
 import { scrapeMarketPrices } from "./services/scraper";
 import { analyzeProperty } from "./services/ai";
 import { searchLocations } from "./services/provinces";
-import { geocodeLocationCached } from "./services/geocoding";
+import { geocodeLocationCached, suggestLocations } from "./services/geocoding";
 import { z } from "zod";
 import type { InsertPropertyAnalysis } from "@shared/schema";
 
@@ -120,8 +120,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.method === 'GET' && action === 'locations-search') {
         const q = req.query.q as string;
         if (!q || q.length < 2) return res.json([]);
-        const results = await searchLocations(q, 10);
-        return res.json(results);
+        const [mapboxSuggestions, vnAdmin] = await Promise.all([
+          suggestLocations(q, 10).catch(() => []),
+          searchLocations(q, 10).catch(() => [])
+        ]);
+        const combined = [...mapboxSuggestions, ...vnAdmin].slice(0, 10);
+        return res.json(combined);
       }
 
       if (req.method === 'POST' && action === 'locations-geocode') {

@@ -8,7 +8,7 @@ import { fetchAmenities, fetchInfrastructure } from '../server/services/overpass
 import { scrapeMarketPrices } from '../server/services/scraper.js';
 import { analyzeProperty } from '../server/services/ai.js';
 import { searchLocations } from '../server/services/provinces.js';
-import { geocodeLocationCached } from '../server/services/geocoding.js';
+import { geocodeLocationCached, suggestLocations } from '../server/services/geocoding.js';
 import type { PropertyAnalysis, InsertPropertyAnalysis } from '../shared/schema.js';
 
 const store = new Map<string, PropertyAnalysis>();
@@ -128,8 +128,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET' && action === 'locations-search') {
       const q = req.query.q as string;
       if (!q || q.length < 2) return res.json([]);
-      const results = await searchLocations(q, 10);
-      return res.json(results);
+      const [mapboxSuggestions, vnAdmin] = await Promise.all([
+        suggestLocations(q, 10).catch(() => []),
+        searchLocations(q, 10).catch(() => [])
+      ]);
+      const combined = [...mapboxSuggestions, ...vnAdmin].slice(0, 10);
+      return res.json(combined);
     }
 
     if (req.method === 'POST' && action === 'locations-geocode') {

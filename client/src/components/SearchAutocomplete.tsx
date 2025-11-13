@@ -6,7 +6,7 @@ import { API_ENDPOINTS } from '@/lib/api';
 interface VNSearchResult {
   name: string;
   fullName: string;
-  type: 'province' | 'district' | 'ward';
+  type: 'province' | 'district' | 'ward' | 'address' | 'place' | 'poi' | 'locality' | 'neighborhood';
   province?: string;
   district?: string;
   code: number;
@@ -163,6 +163,16 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
         return 'Quận/Huyện';
       case 'ward':
         return 'Phường/Xã';
+      case 'address':
+        return 'Địa chỉ';
+      case 'place':
+        return 'Địa danh';
+      case 'poi':
+        return 'POI';
+      case 'locality':
+        return 'Khu vực';
+      case 'neighborhood':
+        return 'Khu phố';
       default:
         return type;
     }

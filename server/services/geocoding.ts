@@ -35,6 +35,42 @@ export async function geocodeLocation(query: string): Promise<GeocodingResult | 
   }
 }
 
+export interface LocationSuggestion {
+  name: string;
+  fullName: string;
+  type: 'address' | 'place' | 'poi' | 'locality' | 'neighborhood';
+  code: number;
+  geocodeQuery: string;
+}
+
+export async function suggestLocations(query: string, limit: number = 10): Promise<LocationSuggestion[]> {
+  const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+  if (!token) {
+    return [];
+  }
+
+  const url = `${MAPBOX_API_BASE}/${encodeURIComponent(query)}.json?access_token=${token}&limit=${limit}&country=VN&language=vi&types=address,place,poi,locality,neighborhood`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    return [];
+  }
+  const data = await response.json();
+  const features = Array.isArray(data.features) ? data.features : [];
+  const suggestions: LocationSuggestion[] = features.map((feature: any, i: number) => {
+    const firstType = Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : 'place';
+    const fullName = feature.place_name || feature.text || query;
+    const name = feature.text || fullName;
+    return {
+      name,
+      fullName,
+      type: firstType as LocationSuggestion['type'],
+      code: 100000 + i,
+      geocodeQuery: fullName
+    };
+  });
+  return suggestions;
+}
+
 // Cache for geocoding results to minimize API calls
 const geocodeCache = new Map<string, { result: GeocodingResult | null; timestamp: number }>();
 const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours

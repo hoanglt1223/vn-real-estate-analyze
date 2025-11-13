@@ -1,4 +1,4 @@
-import * as turf from '@turf/turf';
+import { distance as turfDistance, point as turfPoint } from '@turf/turf';
 
 const OVERPASS_API = 'https://overpass-api.de/api/interpreter';
 
@@ -87,9 +87,9 @@ export async function fetchAmenities(
 
         if (!isNotablePlace(element.tags, category)) continue;
 
-        const distance = turf.distance(
-          turf.point([lng, lat]),
-          turf.point([elementLng, elementLat]),
+        const distance = turfDistance(
+          turfPoint([lng, lat]),
+          turfPoint([elementLng, elementLat]),
           { units: 'meters' }
         );
 
