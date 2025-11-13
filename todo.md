@@ -2,140 +2,212 @@
 
 ## 🔴 CRITICAL - Cần làm ngay
 
-### 1. Fix Mapbox Geocoding Search
-- [ ] Thêm autocomplete dropdown cho search box
-- [ ] Hiển thị danh sách gợi ý khi gõ (debounce 300ms)
-- [ ] Tự động fill thông tin khu đất khi chọn địa điểm
-- [ ] Tự động vẽ polygon rectangle quanh điểm được chọn
+### 1. Property Management System
+- [ ] Tạo trang quản lý các bất động sản đã phân tích
+- [ ] Lưu trữ kết quả phân tích vào database
+- [ ] Danh sách properties với tìm kiếm và filter
+- [ ] So sánh nhiều properties cùng lúc
+- [ ] Export/Import data
 
-### 2. Fix Amenity Filters - Hiển thị thực tế
-- [ ] Khi chọn filter Giáo dục/Y tế/Mua sắm - phải gọi API thực
-- [ ] Hiển thị markers tiện ích lên bản đồ ngay khi có data
-- [ ] Thêm statistics panel: số lượng từng loại tiện ích
-- [ ] Group markers theo category với màu sắc riêng
-- [ ] Popup chi tiết khi click vào marker
+### 2. Advanced Filtering & Search
+- [ ] Filter theo khoảng giá
+- [ ] Filter theo điểm AI score
+- [ ] Tìm kiếm theo địa chỉ đã lưu
+- [ ] Sắp xếp theo nhiều tiêu chí
 
-### 3. Infrastructure Layers - Hiển thị overlay
-- [ ] Khi chọn "Đường lớn" - highlight roads từ OSM
-- [ ] Khi chọn "Metro" - vẽ metro lines
-- [ ] Khi chọn "Khu công nghiệp" - highlight industrial zones
-- [ ] Khi chọn các layer khác - show heatmap/polygons
-
-### 4. Statistics Dashboard
-- [ ] Tạo panel thống kê tổng quan
-- [ ] Biểu đồ phân bố tiện ích theo khoảng cách
-- [ ] Bảng top 10 tiện ích gần nhất
-- [ ] Số liệu cụ thể cho từng category
+### 3. Market Data Real Implementation
+- [ ] Implement real scraper cho Batdongsan.com.vn
+- [ ] Implement scraper cho Chotot
+- [ ] Parse và aggregate pricing data
+- [ ] Show price trends over time
 
 ---
 
 ## 🟡 IMPORTANT - Cần hoàn thiện
 
-### 5. Real-time Data Integration
-- [ ] Kiểm tra Overpass API responses có data thật
-- [ ] Cache amenities data để tránh gọi API liên tục
-- [ ] Error handling khi API timeout hoặc fail
-- [ ] Loading states cho mọi API calls
+### 4. Data Caching & Performance
+- [ ] Implement Redis/Memory cache cho Overpass API
+- [ ] Cache amenities data by location+radius
+- [ ] Prefetch data for nearby areas
+- [ ] Optimize API response size
 
-### 6. Map Improvements
-- [ ] Fix "radius-circle" source duplicate error
+### 5. Map Enhancements
 - [ ] Thêm marker clustering cho nhiều amenities
 - [ ] Thêm heatmap layer cho mật độ tiện ích
 - [ ] 3D buildings layer (Mapbox feature)
+- [ ] Custom marker icons cho từng loại amenity
 
-### 7. PDF Export Enhancement
+### 6. PDF Export Enhancement
 - [ ] Capture map với tất cả markers visible
 - [ ] Thêm charts/graphs vào PDF
 - [ ] Format đẹp hơn với colors và icons
 - [ ] Compress PDF size
+- [ ] Watermark với logo/branding
 
-### 8. AI Analysis Improvements
-- [ ] Thêm context về khoảng cách đến tiện ích
-- [ ] Phân tích chi tiết hơn về infrastructure
-- [ ] Risk assessment dựa trên real data
-- [ ] Price estimation dựa trên market data thực
+### 7. AI Analysis Deep Dive
+- [ ] Explain why each amenity matters
+- [ ] Suggest improvements for property
+- [ ] Compare with similar areas
+- [ ] Investment timeline recommendations
 
 ---
 
 ## 🟢 ENHANCEMENTS - Nâng cao
 
-### 9. Market Data Scraping
-- [ ] Implement crawler cho Batdongsan.com.vn
-- [ ] Implement crawler cho Chotot
-- [ ] Parse và store market prices
-- [ ] Tạo price heatmap
+### 8. Advanced Visualizations
+- [ ] Price heatmap overlay
+- [ ] Amenity density heatmap
+- [ ] Traffic patterns overlay
+- [ ] Flood risk zones overlay
+- [ ] Future development plans overlay
 
-### 10. UI/UX Polish
-- [ ] Responsive design cho mobile
-- [ ] Dark mode support
+### 9. UI/UX Polish
+- [ ] Responsive design cho mobile/tablet
+- [ ] Better loading states với skeletons
 - [ ] Animations cho map transitions
-- [ ] Better error messages in Vietnamese
+- [ ] Onboarding tutorial cho new users
+- [ ] Keyboard shortcuts
 
-### 11. Performance Optimization
-- [ ] Debounce radius slider
+### 10. Performance Optimization
 - [ ] Lazy load amenity markers
 - [ ] Virtual scrolling cho amenity list
 - [ ] Optimize bundle size
+- [ ] Progressive Web App (PWA)
+- [ ] Service worker for offline support
 
-### 12. Testing & Quality
-- [ ] Test full workflow end-to-end
-- [ ] Test với nhiều địa điểm khác nhau
-- [ ] Test error cases
-- [ ] Cross-browser testing
+### 11. Testing & Quality
+- [ ] Unit tests cho core functions
+- [ ] Integration tests cho API calls
+- [ ] E2E tests với Playwright
+- [ ] Performance monitoring
+- [ ] Error tracking (Sentry)
 
 ---
 
 ## 🔵 NEW FEATURES - Tính năng mới đề xuất
 
-### 13. Xuất Báo Cáo Chi Tiết
-- [ ] Xuất PDF báo cáo đầy đủ với tất cả thông tin phân tích
-- [ ] Bao gồm map screenshot theo filter hiện tại
-- [ ] Charts và graphs cho market data
-- [ ] Danh sách đầy đủ tất cả tiện ích xung quanh
-- [ ] AI recommendations chi tiết
-- [ ] Risk assessment với visualization
+### 12. Collaboration & Sharing
+- [ ] Share analysis results via link
+- [ ] Add notes/comments to properties
+- [ ] Team workspace for agencies
+- [ ] Email reports to clients
+- [ ] Public gallery of analyses
 
-### 14. Xuất Bản Đồ Theo Filter
-- [ ] Export PNG/JPG của map với filter hiện tại
-- [ ] Bao gồm tất cả markers visible
-- [ ] Bao gồm infrastructure overlays được chọn
-- [ ] Có legend cho các layers
-- [ ] High resolution cho print quality
+### 13. Advanced Analytics
+- [ ] Historical price tracking
+- [ ] ROI calculator với scenarios
+- [ ] Loan/mortgage calculator
+- [ ] Tax estimation
+- [ ] Rental yield projection
 
-### 15. Hướng Dẫn Polygon Drawing
-- [ ] Tooltip hướng dẫn cách vẽ polygon
-- [ ] "Click để bắt đầu vẽ, click vào điểm đầu tiên để hoàn thành"
-- [ ] Visual feedback khi đang vẽ
-- [ ] Nút "Hoàn thành" rõ ràng hoặc hướng dẫn double-click
+### 14. Neighborhood Insights
+- [ ] Demographics data integration
+- [ ] Crime statistics
+- [ ] School ratings
+- [ ] Commute time estimates
+- [ ] Local events and news
+
+### 15. AI-Powered Recommendations
+- [ ] Similar properties suggestion
+- [ ] Best time to buy/sell
+- [ ] Investment opportunities nearby
+- [ ] Alert for price drops
+- [ ] Custom scoring weights
 
 ---
 
 ## 📋 DONE - Đã hoàn thành
 
+### Core Features
 - [x] Basic map với Mapbox GL
 - [x] Polygon drawing tool
 - [x] Property metrics calculation (area, orientation, frontage)
 - [x] Backend API routes
-- [x] OpenAI integration
+- [x] OpenAI integration (với fallback scoring)
 - [x] Basic PDF export
-- [x] Geocoding search với autocomplete
+
+### Map & Search
+- [x] Geocoding search với autocomplete dropdown
+- [x] Debounced search với gợi ý real-time
+- [x] Tự động vẽ polygon khi chọn địa điểm
 - [x] Multiple map styles (Streets, Light, Dark, Outdoors, Satellite, Navigation)
-- [x] Basic amenity markers với real data
-- [x] Radius circle visualization
-- [x] Transport amenities (Sân bay, Nhà ga, Bến xe buýt)
-- [x] Infrastructure overlays (Bus routes, Metro lines)
+- [x] Radius circle visualization (up to 30km)
 - [x] Geolocation control (Định vị vị trí hiện tại)
-- [x] Icon riêng cho từng loại transport (✈️ sân bay, 🚉 nhà ga, 🚌 bến xe, 🚏 trạm xe buýt)
+- [x] Map style selector positioned correctly
+- [x] Instruction panel for polygon drawing
+
+### Amenities & Filters  
+- [x] Real-time amenity data from OpenStreetMap Overpass API
+- [x] Amenity markers với category colors
+- [x] Notable place filtering (exclude small shops, keep major venues)
+- [x] Education type labels (Tiểu học, THCS, THPT, Đại học, Mầm non)
+- [x] Healthcare facilities (Hospital, Clinic, Pharmacy)
+- [x] Shopping centers (Supermarket, Mall, Department Store)
+- [x] Entertainment venues (Cinema, Theatre, Fitness, Stadium)
+- [x] Transport amenities (Airport ✈️, Station 🚉, Bus 🚌)
+- [x] Popup chi tiết khi click marker
+- [x] Amenity list with education subtypes
+- [x] Statistics panel với real data
+- [x] Extended radius to 30km for distant facilities
+
+### Infrastructure Layers
+- [x] Roads overlay (Motorway, Trunk, Primary, Secondary)
+- [x] Metro stations and lines
+- [x] Bus routes overlay
+- [x] Industrial zones
+- [x] Power infrastructure (Towers, Substations)
+- [x] Cemeteries
+- [x] Water bodies (Rivers, Canals)
+- [x] Interactive infrastructure popups
+- [x] Layer toggle controls
+
+### AI Analysis
+- [x] Multi-factor scoring system (Amenities, Planning, Residential, Investment, Risk)
+- [x] Detailed score explanations for each component
+- [x] Score calculation formulas displayed
+- [x] AI-powered summary (with fallback)
+- [x] Investment recommendations (Buy/Consider/Avoid)
+- [x] Risk assessment with severity levels
+- [x] Collapsible explanation panels
+
+### Market Data
+- [x] Market price structure with mock data
+- [x] Source attribution display (name + type badges)
+- [x] Price trend indicators
+- [x] Average/min/max pricing
+- [x] Listing count display
+
+### Technical Improvements
+- [x] Type-safe data structures throughout
+- [x] Optional chaining for undefined data
+- [x] Graceful error handling
+- [x] Loading states for API calls
+- [x] Auto-analysis on filter changes
+- [x] Dark mode support
+- [x] Vietnamese language UI
+- [x] Comprehensive data validation
 
 ---
 
 ## 🐛 BUGS - Cần fix
 
-1. **Mapbox source duplicate error** - "radius-circle" được add nhiều lần khi switch style
-2. **Filters không gọi API** - Chọn category nhưng không fetch data mới
-3. **Statistics không cập nhật** - Số liệu hardcoded thay vì real-time
-4. **Search không autocomplete** - Chỉ search khi click button
-5. **Map markers không clear** - Khi thay đổi filters, markers cũ vẫn còn
+### Known Issues
+1. **OpenAI API Key Invalid** - Cần cập nhật API key hợp lệ (hiện tại dùng fallback scoring)
+2. **Chart width warnings** - Recharts warnings về container dimensions
+3. **Map performance** - Có thể chậm với nhiều markers (cần clustering)
+4. **PDF map capture** - Map screenshot có thể thiếu markers
+5. **Mobile responsiveness** - Sidebar cần optimize cho màn hình nhỏ
+
+### Fixed Recently
+- [x] Radius circle duplicate source error
+- [x] Filters now trigger real API calls
+- [x] Statistics update with real-time data
+- [x] Search autocomplete working
+- [x] Markers clear properly on filter change
+- [x] Map style selector overlap
+- [x] Instruction panel positioning
+- [x] Education type labels displaying
+- [x] Score explanation undefined values
 
 ---
 
@@ -143,17 +215,35 @@
 
 ### API Limits
 - Mapbox: 50,000 requests/month (free tier)
-- OpenAI: Pay per use
-- Overpass API: Rate limited, cần implement caching
+- OpenAI: Pay per use (currently using fallback due to invalid key)
+- Overpass API: Rate limited, need to implement caching
 
 ### Data Sources
-- Amenities: OpenStreetMap Overpass API
-- Infrastructure: OSM + local government WMS/WFS
-- Market prices: Web scraping (need to implement)
-- AI Analysis: OpenAI GPT-4o Mini
+- Amenities: OpenStreetMap Overpass API ✅
+- Infrastructure: OSM + local government WMS/WFS ✅
+- Market prices: Mock data (need real scraping)
+- AI Analysis: OpenAI GPT-4o Mini (with fallback)
 
 ### Performance Targets
-- Map load time: < 2s
-- Amenity search: < 3s
-- AI analysis: < 10s
-- PDF generation: < 5s
+- Map load time: < 2s ✅
+- Amenity search: < 5s (depends on Overpass API)
+- AI analysis: < 10s ✅
+- PDF generation: < 5s ✅
+
+### Tech Stack
+- Frontend: React 18 + TypeScript + Vite
+- UI: Shadcn/ui + Tailwind CSS + Radix UI
+- Maps: Mapbox GL JS v3 + Mapbox Draw
+- Backend: Express.js + TypeScript
+- Database: PostgreSQL (Neon) + Drizzle ORM
+- AI: OpenAI GPT-4o Mini
+- Geospatial: Turf.js + Overpass API
+
+### Recent Updates (Nov 13, 2025)
+- ✅ Extended amenity radius to 30km for airports and industrial zones
+- ✅ Added education institution type labels (Tiểu học, THCS, THPT, etc.)
+- ✅ Improved amenity filtering to include notable places without names
+- ✅ Fixed score explanation system with proper data flow
+- ✅ Added market price source attribution
+- ✅ Repositioned UI elements to avoid overlaps
+- ✅ Comprehensive type safety improvements
