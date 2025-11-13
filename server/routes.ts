@@ -5,6 +5,7 @@ import { calculatePropertyMetrics, assessRisks } from "./services/geospatial";
 import { fetchAmenities, fetchInfrastructure } from "./services/overpass";
 import { scrapeMarketPrices } from "./services/scraper";
 import { analyzeProperty } from "./services/ai";
+import { searchLocations } from "./services/provinces";
 import { z } from "zod";
 
 const analyzePropertySchema = z.object({
@@ -151,6 +152,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/locations/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+      
+      const results = await searchLocations(query, 10);
+      res.json(results);
+    } catch (error: any) {
+      console.error('Location search error:', error);
+      res.status(500).json({ 
+        error: 'Failed to search locations',
+        message: error.message 
+      });
     }
   });
 

@@ -59,9 +59,9 @@ export async function scrapeMarketPrices(
     });
   }
 
-  // If no real data available, use estimation
+  // If no real data available, throw error
   if (allListings.length === 0) {
-    return generateEstimatedPrices(lat, lng, radius);
+    throw new Error('No market data available for this location. Please ensure APIFY_API_KEY is configured and try a different area.');
   }
 
   // Calculate statistics from real listings
@@ -97,8 +97,7 @@ async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Pr
   const APIFY_TOKEN = process.env.APIFY_API_KEY;
   
   if (!APIFY_TOKEN) {
-    console.log('APIFY_API_KEY not found - using mock data');
-    return generateMockListings('batdongsan', lat, lng, radius, 15);
+    throw new Error('APIFY_API_KEY is required. Please add it to Replit Secrets to fetch real Batdongsan.com.vn data.');
   }
 
   try {
@@ -188,8 +187,8 @@ async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Pr
     const items = await dataResponse.json();
     
     if (!items || items.length === 0) {
-      console.log('No items returned from Apify - using mock data');
-      return generateMockListings('batdongsan', lat, lng, radius, 15);
+      console.log('No items returned from Apify scraper');
+      throw new Error('No listings found from Batdongsan.com.vn for this location. Try a different area or radius.');
     }
 
     console.log(`Successfully fetched ${items.length} listings from Batdongsan via Apify`);
@@ -203,17 +202,15 @@ async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Pr
     
   } catch (error) {
     console.error('Apify scraper error:', error);
-    console.log('Falling back to mock data');
-    return generateMockListings('batdongsan', lat, lng, radius, 15);
+    throw error; // Re-throw error instead of falling back to mock data
   }
 }
 
 async function fetchFromChotot(lat: number, lng: number, radius: number): Promise<{ listings: PriceListing[] }> {
-  // TODO: Implement real API integration with Chotot.com
-  // Chotot may have a public API or partnership program
-  
-  console.log('Chotot API not implemented yet - using mock data');
-  return generateMockListings('chotot', lat, lng, radius, 10);
+  // Chotot.com does not have a public API
+  // Return empty results instead of mock data
+  console.log('Chotot.com API not available - skipping this source');
+  return { listings: [] };
 }
 
 function parseApifyResults(items: any[], lat: number, lng: number, radius: number): { listings: PriceListing[] } {
