@@ -403,9 +403,6 @@ export default function MapView({
     try {
       infraLayers.forEach(layerId => {
         if (map.current?.getLayer(layerId)) {
-          map.current.off('click', layerId);
-          map.current.off('mouseenter', layerId);
-          map.current.off('mouseleave', layerId);
           map.current.removeLayer(layerId);
         }
       });
