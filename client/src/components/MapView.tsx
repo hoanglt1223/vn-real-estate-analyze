@@ -14,6 +14,13 @@ interface Amenity {
   lng: number;
   distance?: number;
   type?: string;
+  subtype?: string;
+  tags?: {
+    amenity?: string;
+    school_type?: string;
+    isced_level?: string;
+    operator_type?: string;
+  };
 }
 
 interface MapViewProps {
@@ -67,6 +74,47 @@ const categoryVietnamese: Record<string, string> = {
   transport: 'Giao thông',
   default: 'Khác'
 };
+
+function getEducationTypeLabel(amenity: Amenity): string {
+  if (amenity.category !== 'education') return '';
+  
+  const tags = amenity.tags;
+  if (!tags) return '';
+  
+  if (tags.amenity === 'university') {
+    return 'Đại học / Cao đẳng';
+  }
+  
+  if (tags.amenity === 'college') {
+    return 'Cao đẳng / Trung cấp';
+  }
+  
+  if (tags.amenity === 'school') {
+    if (tags.school_type === 'primary' || tags.isced_level === '1') {
+      return 'Trường Tiểu học';
+    }
+    if (tags.school_type === 'secondary' || tags.isced_level === '2') {
+      return 'Trường Trung học cơ sở (THCS)';
+    }
+    if (tags.school_type === 'high' || tags.isced_level === '3') {
+      return 'Trường Trung học phổ thông (THPT)';
+    }
+    if (tags.school_type === 'kindergarten' || tags.isced_level === '0') {
+      return 'Trường Mầm non';
+    }
+    
+    if (tags.operator_type === 'government' || tags.operator_type === 'public') {
+      return 'Trường Công lập';
+    }
+    if (tags.operator_type === 'private') {
+      return 'Trường Tư thục';
+    }
+    
+    return 'Trường học';
+  }
+  
+  return 'Cơ sở giáo dục';
+}
 
 export default function MapView({ 
   onPolygonChange, 
@@ -519,9 +567,14 @@ export default function MapView({
       }
       el.textContent = icon;
 
+      const educationType = amenity.category === 'education' ? getEducationTypeLabel(amenity) : '';
+      
       const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
         <div style="padding:8px;">
           <strong style="font-size:14px;">${amenity.name}</strong>
+          ${educationType ? `<div style="margin-top:4px;font-size:12px;color:#3B82F6;font-weight:500;">
+            ${educationType}
+          </div>` : ''}
           <div style="margin-top:4px;font-size:12px;color:#666;">
             ${categoryVietnamese[amenity.category] || categoryVietnamese.default}
           </div>

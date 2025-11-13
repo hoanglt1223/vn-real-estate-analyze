@@ -95,6 +95,12 @@ export async function fetchAmenities(
 
         const name = element.tags?.name || element.tags?.['name:vi'] || getDefaultName(element.tags, category);
 
+        const amenityType = element.tags?.aeroway || element.tags?.railway || element.tags?.amenity || element.tags?.shop || element.tags?.leisure || element.tags?.highway;
+        
+        const subtype = category === 'education' 
+          ? (element.tags?.['school:type'] || element.tags?.['isced:level'] || element.tags?.operator_type)
+          : null;
+
         allAmenities.push({
           id: element.id.toString(),
           name,
@@ -103,7 +109,14 @@ export async function fetchAmenities(
           walkTime: Math.round(distance / 80),
           lat: elementLat,
           lng: elementLng,
-          type: element.tags?.aeroway || element.tags?.railway || element.tags?.amenity || element.tags?.shop || element.tags?.leisure || element.tags?.highway
+          type: amenityType,
+          subtype: subtype,
+          tags: {
+            amenity: element.tags?.amenity,
+            school_type: element.tags?.['school:type'],
+            isced_level: element.tags?.['isced:level'],
+            operator_type: element.tags?.operator_type
+          }
         });
       }
     } catch (error) {
