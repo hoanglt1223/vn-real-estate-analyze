@@ -1,52 +1,37 @@
-// TrackAsia Geocoding Service
-// Uses TrackAsia Search API for geocoding Vietnamese locations
-
 export interface GeocodingResult {
   coordinates: [number, number]; // [lng, lat]
   placeName: string;
   placeType: string;
   context?: string;
 }
-
-const TRACKASIA_API_BASE = 'https://api.trackasia.com/v1';
+const MAPBOX_API_BASE = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
 
 export async function geocodeLocation(query: string): Promise<GeocodingResult | null> {
-  const TRACKASIA_API_KEY = process.env.TRACKASIA_API_KEY;
-  
-  if (!TRACKASIA_API_KEY) {
-    throw new Error('TRACKASIA_API_KEY is required for geocoding. Please add it to Replit Secrets.');
+  const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+  if (!token) {
+    throw new Error('MAPBOX_TOKEN or VITE_MAPBOX_TOKEN is required for geocoding');
   }
 
   try {
-    // TrackAsia Search API endpoint
-    const url = `${TRACKASIA_API_BASE}/search?key=${TRACKASIA_API_KEY}&q=${encodeURIComponent(query)}&country=VN&limit=1`;
-    
+    const url = `${MAPBOX_API_BASE}/${encodeURIComponent(query)}.json?access_token=${token}&limit=1&country=VN&language=vi`;
     const response = await fetch(url);
-    
     if (!response.ok) {
-      console.error(`TrackAsia geocoding error: ${response.status}`);
       return null;
     }
-    
     const data = await response.json();
-    
     if (!data.features || data.features.length === 0) {
-      console.log(`No geocoding results for: ${query}`);
       return null;
     }
-    
     const feature = data.features[0];
     const [lng, lat] = feature.geometry.coordinates;
-    
     return {
       coordinates: [lng, lat],
-      placeName: feature.properties.name || query,
-      placeType: feature.properties.type || 'location',
-      context: feature.properties.context || undefined
+      placeName: feature.place_name || query,
+      placeType: Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : 'location',
+      context: feature.text || undefined
     };
   } catch (error) {
-    console.error('Geocoding error:', error);
-    throw new Error('Failed to geocode location. TrackAsia API may be unavailable.');
+    throw new Error('Failed to geocode location');
   }
 }
 

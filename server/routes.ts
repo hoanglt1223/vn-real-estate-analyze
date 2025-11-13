@@ -8,6 +8,7 @@ import { analyzeProperty } from "./services/ai";
 import { searchLocations } from "./services/provinces";
 import { geocodeLocationCached } from "./services/geocoding";
 import { z } from "zod";
+import type { InsertPropertyAnalysis } from "@shared/schema";
 
 const analyzePropertySchema = z.object({
   coordinates: z.array(z.array(z.number())),
@@ -45,18 +46,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           marketData,
           risks: riskAssessment.risks
         });
-        const analysis = await storage.createPropertyAnalysis({
+        const payload = {
           coordinates: input.coordinates,
           area: metrics.area,
           orientation: metrics.orientation,
           frontageCount: metrics.frontageCount,
           center: metrics.center,
-          amenities,
-          infrastructure,
-          marketData,
-          aiAnalysis,
-          risks: riskAssessment.risks
-        });
+          amenities: amenities as any[],
+          infrastructure: infrastructure as any,
+          marketData: marketData as any,
+          aiAnalysis: aiAnalysis as any,
+          risks: riskAssessment.risks as any[],
+        } as unknown as InsertPropertyAnalysis;
+        const analysis = await storage.createPropertyAnalysis(payload);
         return res.json({
           id: analysis.id,
           ...metrics,
@@ -181,18 +183,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         risks: riskAssessment.risks
       });
 
-      const analysis = await storage.createPropertyAnalysis({
+      const payload = {
         coordinates: input.coordinates,
         area: metrics.area,
         orientation: metrics.orientation,
         frontageCount: metrics.frontageCount,
         center: metrics.center,
-        amenities,
-        infrastructure,
-        marketData,
-        aiAnalysis,
-        risks: riskAssessment.risks
-      });
+        amenities: amenities as any[],
+        infrastructure: infrastructure as any,
+        marketData: marketData as any,
+        aiAnalysis: aiAnalysis as any,
+        risks: riskAssessment.risks as any[],
+      } as unknown as InsertPropertyAnalysis;
+      const analysis = await storage.createPropertyAnalysis(payload);
 
       res.json({
         id: analysis.id,
