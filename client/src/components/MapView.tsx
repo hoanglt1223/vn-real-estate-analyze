@@ -546,9 +546,9 @@ export default function MapView({
       <div className="absolute top-4 left-4 z-[100]">
         <SearchAutocomplete onSelect={handleSearchSelect} />
       </div>
-      <div className="absolute top-20 right-4 z-[90] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm max-w-xs">
-        <p className="font-semibold text-gray-800 mb-1">💡 Hướng dẫn vẽ khu đất:</p>
-        <p className="text-gray-600 text-xs">
+      <div className="absolute top-20 left-4 z-[90] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm max-w-xs">
+        <p className="font-semibold text-gray-800 dark:text-gray-100 mb-1">💡 Hướng dẫn vẽ khu đất:</p>
+        <p className="text-gray-600 dark:text-gray-300 text-xs">
           1. Click vào icon <span className="inline-block w-6 h-6 align-middle">📐</span> ở góc trên bản đồ<br/>
           2. Click lần lượt để đánh dấu các góc khu đất<br/>
           3. Click vào điểm đầu tiên để hoàn thành polygon
