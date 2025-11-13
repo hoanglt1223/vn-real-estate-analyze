@@ -12,71 +12,67 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Play } from 'lucide-react';
-
-//todo: remove mock functionality
-const mockAmenities = [
-  { id: '1', name: 'Trường Tiểu học Lê Quý Đôn', category: 'education', distance: 350, walkTime: 5 },
-  { id: '2', name: 'Trường THCS Trần Đại Nghĩa', category: 'education', distance: 800, walkTime: 10 },
-  { id: '3', name: 'Bệnh viện Quận 1', category: 'healthcare', distance: 1200, walkTime: 15 },
-  { id: '4', name: 'Nhà thuốc Long Châu', category: 'healthcare', distance: 200, walkTime: 3 },
-  { id: '5', name: 'Siêu thị CoopMart', category: 'shopping', distance: 500, walkTime: 7 },
-  { id: '6', name: 'Circle K', category: 'shopping', distance: 150, walkTime: 2 },
-  { id: '7', name: 'Rạp CGV', category: 'entertainment', distance: 2000, walkTime: 25 },
-  { id: '8', name: 'Phòng gym California', category: 'entertainment', distance: 600, walkTime: 8 }
-];
-
-const mockPriceData = {
-  min: 45000000,
-  avg: 85000000,
-  max: 150000000,
-  median: 80000000,
-  listingCount: 47,
-  trend: 'up' as const
-};
-
-const mockAIScores = {
-  overall: 78,
-  amenities: 85,
-  planning: 72,
-  residential: 80,
-  investment: 75,
-  risk: 25
-};
-
-const mockSummary = 'Khu đất nằm ở vị trí tốt với nhiều tiện ích xung quanh. Quy hoạch ổn định, phù hợp cho cả mục đích an cư và đầu tư. Giá hiện tại hợp lý so với thị trường. Rủi ro thấp, không có yếu tố bất lợi lớn. Khu vực có tiềm năng tăng giá trong tương lai do hạ tầng đang phát triển.';
-
-const mockRisks = [
-  { id: '1', type: 'medium' as const, title: 'Gần khu công nghiệp', description: 'Khu đất nằm trong bán kính 2km từ khu công nghiệp, có thể ảnh hưởng đến chất lượng không khí và tiếng ồn.', distance: 1800, icon: <></> },
-  { id: '2', type: 'low' as const, title: 'Gần trạm điện', description: 'Có trạm điện trong bán kính 500m. Khoảng cách đủ an toàn nhưng cần lưu ý.', distance: 450, icon: <></> }
-];
+import { analyzeProperty } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AnalysisPage() {
+  const { toast } = useToast();
   const [propertyData, setPropertyData] = useState({
     area: 0,
     orientation: '',
-    frontageCount: 0
+    frontageCount: 0,
+    coordinates: [] as number[][]
   });
   const [radius, setRadius] = useState(1000);
   const [selectedCategories, setSelectedCategories] = useState(['education', 'healthcare']);
   const [selectedLayers, setSelectedLayers] = useState(['roads', 'metro']);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showResults, setShowResults] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
 
   const handlePolygonChange = (data: any) => {
     setPropertyData({
       area: data.area,
       orientation: data.orientation,
-      frontageCount: data.frontageCount
+      frontageCount: data.frontageCount,
+      coordinates: data.coordinates
     });
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
+    if (!propertyData.coordinates || propertyData.coordinates.length === 0) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng vẽ khu đất trên bản đồ trước',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setIsAnalyzing(true);
-    //todo: remove mock functionality - replace with real API call
-    setTimeout(() => {
+    
+    try {
+      const results = await analyzeProperty({
+        coordinates: propertyData.coordinates,
+        radius,
+        categories: selectedCategories,
+        layers: selectedLayers
+      });
+
+      setAnalysisResults(results);
+      
+      toast({
+        title: 'Thành công',
+        description: 'Đã phân tích xong khu đất'
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi phân tích',
+        description: error.message || 'Không thể phân tích khu đất',
+        variant: 'destructive'
+      });
+    } finally {
       setIsAnalyzing(false);
-      setShowResults(true);
-    }, 2000);
+    }
   };
 
   const handleExportPDF = () => {
@@ -111,7 +107,7 @@ export default function AnalysisPage() {
                 onLayerChange={setSelectedLayers}
               />
 
-              {propertyData.area > 0 && !showResults && (
+              {propertyData.area > 0 && (
                 <Button
                   onClick={handleAnalyze}
                   disabled={isAnalyzing}
@@ -124,7 +120,7 @@ export default function AnalysisPage() {
                   ) : (
                     <>
                       <Play className="w-4 h-4 mr-2" />
-                      Phân Tích Ngay
+                      {analysisResults ? 'Phân Tích Lại' : 'Phân Tích Ngay'}
                     </>
                   )}
                 </Button>
@@ -142,7 +138,7 @@ export default function AnalysisPage() {
             />
           </div>
 
-          {showResults && (
+          {analysisResults && (
             <div className="lg:hidden">
               <Tabs defaultValue="analysis" className="w-full">
                 <TabsList className="w-full rounded-none">
@@ -153,18 +149,18 @@ export default function AnalysisPage() {
                 <ScrollArea className="h-[300px]">
                   <TabsContent value="analysis" className="p-4 space-y-4">
                     <AIAnalysisCard
-                      scores={mockAIScores}
-                      recommendation="buy"
-                      estimatedPrice={85000000}
-                      summary={mockSummary}
+                      scores={analysisResults.aiAnalysis.scores}
+                      recommendation={analysisResults.aiAnalysis.recommendation}
+                      estimatedPrice={analysisResults.aiAnalysis.estimatedPrice}
+                      summary={analysisResults.aiAnalysis.summary}
                     />
-                    <MarketPriceCard data={mockPriceData} />
+                    <MarketPriceCard data={analysisResults.marketData} />
                   </TabsContent>
                   <TabsContent value="amenities" className="p-4">
-                    <AmenityList amenities={mockAmenities} />
+                    <AmenityList amenities={analysisResults.amenities} />
                   </TabsContent>
                   <TabsContent value="risk" className="p-4">
-                    <RiskAssessmentCard risks={mockRisks} overallRiskLevel="medium" />
+                    <RiskAssessmentCard risks={analysisResults.risks} overallRiskLevel={analysisResults.overallRiskLevel} />
                   </TabsContent>
                 </ScrollArea>
               </Tabs>
@@ -172,19 +168,19 @@ export default function AnalysisPage() {
           )}
         </div>
 
-        {showResults && (
+        {analysisResults && (
           <div className="hidden lg:block w-80 xl:w-96 border-l bg-background">
             <ScrollArea className="h-full">
               <div className="p-6 space-y-6">
                 <AIAnalysisCard
-                  scores={mockAIScores}
-                  recommendation="buy"
-                  estimatedPrice={85000000}
-                  summary={mockSummary}
+                  scores={analysisResults.aiAnalysis.scores}
+                  recommendation={analysisResults.aiAnalysis.recommendation}
+                  estimatedPrice={analysisResults.aiAnalysis.estimatedPrice}
+                  summary={analysisResults.aiAnalysis.summary}
                 />
-                <MarketPriceCard data={mockPriceData} />
-                <AmenityList amenities={mockAmenities} />
-                <RiskAssessmentCard risks={mockRisks} overallRiskLevel="medium" />
+                <MarketPriceCard data={analysisResults.marketData} />
+                <AmenityList amenities={analysisResults.amenities} />
+                <RiskAssessmentCard risks={analysisResults.risks} overallRiskLevel={analysisResults.overallRiskLevel} />
               </div>
             </ScrollArea>
           </div>

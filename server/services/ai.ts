@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-});
+}) : null;
 
 export interface AIAnalysisInput {
   area: number;
@@ -179,7 +179,7 @@ function calculateInvestmentScore(marketData: any, infrastructure: any, area: nu
 }
 
 async function generateAISummary(input: AIAnalysisInput, scores: any): Promise<string> {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!openai) {
     return generateFallbackSummary(input, scores);
   }
 
