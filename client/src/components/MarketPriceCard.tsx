@@ -10,9 +10,11 @@ interface PriceData {
   median: number;
   listingCount: number;
   trend?: 'up' | 'down' | 'stable';
+  pricePerSqm?: number;
   sources?: Array<{
     name: string;
     type: string;
+    listingCount?: number;
   }>;
 }
 
@@ -25,9 +27,16 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
 
   const formatPrice = (price: number) => {
     if (price >= 1000000000) {
-      return `${(price / 1000000000).toFixed(1)} tỷ`;
+      return `${(price / 1000000000).toFixed(1)} tỷ VND`;
     }
-    return `${(price / 1000000).toFixed(0)} tr`;
+    return `${(price / 1000000).toFixed(0)} tr VND`;
+  };
+
+  const formatPricePerSqm = (price: number) => {
+    if (price >= 1000000) {
+      return `${(price / 1000000).toFixed(1)} tr/m²`;
+    }
+    return `${(price / 1000).toFixed(0)}k/m²`;
   };
 
   const chartData = [
@@ -52,27 +61,38 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-3 gap-4">
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Thấp nhất</p>
-            <p className="text-xl font-bold" data-testid="text-price-min">
+            <p className="text-lg font-bold break-words" data-testid="text-price-min">
               {formatPrice(data.min)}
             </p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Trung bình</p>
-            <p className="text-xl font-bold text-primary" data-testid="text-price-avg">
+            <p className="text-lg font-bold text-primary break-words" data-testid="text-price-avg">
               {formatPrice(data.avg)}
             </p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Cao nhất</p>
-            <p className="text-xl font-bold" data-testid="text-price-max">
+            <p className="text-lg font-bold break-words" data-testid="text-price-max">
               {formatPrice(data.max)}
             </p>
           </div>
         </div>
+
+        {data.pricePerSqm && (
+          <div className="p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Giá trung bình/m²</span>
+              <span className="text-lg font-bold text-primary" data-testid="text-price-per-sqm">
+                {formatPricePerSqm(data.pricePerSqm)}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
@@ -99,13 +119,13 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
         {data.sources && data.sources.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-xs font-semibold mb-2">Nguồn dữ liệu:</p>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {data.sources.map((source, idx) => (
-                <div key={idx} className="text-xs text-muted-foreground flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span>• {source.name}</span>
+                <div key={idx} className="text-xs text-muted-foreground flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="truncate">• {source.name}</span>
                     {source.type && (
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs flex-shrink-0">
                         {source.type === 'real_estate_portal' ? 'Portal' : 
                          source.type === 'marketplace' ? 'Marketplace' : 
                          source.type === 'estimated' ? 'Ước tính' : source.type}
@@ -113,7 +133,7 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
                     )}
                   </div>
                   {source.listingCount && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs flex-shrink-0">
                       {source.listingCount} tin
                     </Badge>
                   )}
