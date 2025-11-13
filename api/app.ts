@@ -8,7 +8,7 @@ import { fetchAmenities, fetchInfrastructure } from '../server/services/overpass
 import { scrapeMarketPrices } from '../server/services/scraper.js';
 import { analyzeProperty } from '../server/services/ai.js';
 import { searchLocations } from '../server/services/provinces.js';
-import { geocodeLocationCached, suggestLocations } from '../server/services/geocoding.js';
+import { geocodeLocationCached, suggestLocations, retrieveLocation, searchCategory } from '../server/services/geocoding.js';
 import type { PropertyAnalysis, InsertPropertyAnalysis } from '../shared/schema.js';
 
 const store = new Map<string, PropertyAnalysis>();
@@ -128,12 +128,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET' && action === 'locations-search') {
       const q = req.query.q as string;
       if (!q || q.length < 2) return res.json([]);
+      const sessionToken = (req.query.sessionToken as string) || undefined;
+      const proximity = (req.query.proximity as string) || undefined;
+      const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood';
       const [mapboxSuggestions, vnAdmin] = await Promise.all([
-        suggestLocations(q, 10).catch(() => []),
+        suggestLocations(q, { limit: 10, sessionToken, types, proximity }).catch(() => []),
         searchLocations(q, 10).catch(() => [])
       ]);
       const combined = [...mapboxSuggestions, ...vnAdmin].slice(0, 10);
       return res.json(combined);
+    }
+
+    if (req.method === 'GET' && action === 'locations-suggest') {
+      const q = req.query.q as string;
+      if (!q || q.length < 2) return res.json([]);
+      const limit = parseInt((req.query.limit as string) || '10', 10);
+      const sessionToken = (req.query.sessionToken as string) || undefined;
+      const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood';
+      const proximity = (req.query.proximity as string) || undefined;
+      const suggestions = await suggestLocations(q, { limit, sessionToken, types, proximity });
+      return res.json(suggestions);
+    }
+
+    if (req.method === 'GET' && action === 'locations-retrieve') {
+      const id = req.query.id as string;
+      if (!id) return res.status(400).json({ message: 'id required' });
+      const sessionToken = (req.query.sessionToken as string) || undefined;
+      const result = await retrieveLocation(id, sessionToken);
+      if (!result) return res.status(404).json({ message: 'not found' });
+      return res.json(result);
+    }
+
+    if (req.method === 'GET' && action === 'locations-category') {
+      const category = req.query.category as string;
+      if (!category) return res.status(400).json({ message: 'category required' });
+      const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+      const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+      const proximity = (req.query.proximity as string) || (lat != null && lng != null ? `${lng},${lat}` : undefined);
+      const bbox = (req.query.bbox as string) || undefined;
+      const sessionToken = (req.query.sessionToken as string) || undefined;
+      const results = await searchCategory(category, { lat, lng, limit, bbox, proximity, sessionToken });
+      return res.json(results);
     }
 
     if (req.method === 'POST' && action === 'locations-geocode') {

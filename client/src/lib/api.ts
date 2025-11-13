@@ -22,6 +22,29 @@ export const API_ENDPOINTS = {
   getSavedSearches: (userId: string) => `/api/saved-searches/${userId}`,
   deleteSavedSearch: (id: string) => `/api/saved-searches/${id}`,
   importProperties: '/api/properties/import',
+  locationsSuggest: (q: string, opts?: { limit?: number; types?: string; sessionToken?: string; proximity?: string }) => {
+    const params = new URLSearchParams({ q });
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    if (opts?.types) params.set('types', opts.types);
+    if (opts?.sessionToken) params.set('sessionToken', opts.sessionToken);
+    if (opts?.proximity) params.set('proximity', opts.proximity);
+    return `${API_BASE}?action=locations-suggest&${params.toString()}`;
+  },
+  locationsRetrieve: (id: string, sessionToken?: string) => {
+    const params = new URLSearchParams({ id });
+    if (sessionToken) params.set('sessionToken', sessionToken);
+    return `${API_BASE}?action=locations-retrieve&${params.toString()}`;
+  },
+  locationsCategory: (categoryCsv: string, opts: { lat?: number; lng?: number; limit?: number; bbox?: string; proximity?: string; sessionToken?: string }) => {
+    const params = new URLSearchParams({ category: categoryCsv });
+    if (opts.lat != null) params.set('lat', String(opts.lat));
+    if (opts.lng != null) params.set('lng', String(opts.lng));
+    if (opts.limit != null) params.set('limit', String(opts.limit));
+    if (opts.bbox) params.set('bbox', opts.bbox);
+    if (opts.proximity) params.set('proximity', opts.proximity);
+    if (opts.sessionToken) params.set('sessionToken', opts.sessionToken);
+    return `${API_BASE}?action=locations-category&${params.toString()}`;
+  },
 } as const;
 
 export async function analyzeProperty(data: {
@@ -215,5 +238,23 @@ export async function importProperties(properties: any[]) {
     body: JSON.stringify({ properties }),
   });
   if (!response.ok) throw new Error('Failed to import properties');
+  return response.json();
+}
+
+export async function suggestLocations(q: string, opts?: { limit?: number; types?: string; sessionToken?: string; proximity?: string }) {
+  const response = await fetch(API_ENDPOINTS.locationsSuggest(q, opts));
+  if (!response.ok) throw new Error('Failed to suggest locations');
+  return response.json();
+}
+
+export async function retrieveLocation(id: string, sessionToken?: string) {
+  const response = await fetch(API_ENDPOINTS.locationsRetrieve(id, sessionToken));
+  if (!response.ok) throw new Error('Failed to retrieve location');
+  return response.json();
+}
+
+export async function searchCategory(categoryCsv: string, opts: { lat?: number; lng?: number; limit?: number; bbox?: string; proximity?: string; sessionToken?: string }) {
+  const response = await fetch(API_ENDPOINTS.locationsCategory(categoryCsv, opts));
+  if (!response.ok) throw new Error('Failed to search category');
   return response.json();
 }
