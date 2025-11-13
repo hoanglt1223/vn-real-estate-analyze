@@ -101,11 +101,20 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
             <p className="text-xs font-semibold mb-2">Nguồn dữ liệu:</p>
             <div className="space-y-1">
               {data.sources.map((source, idx) => (
-                <div key={idx} className="text-xs text-muted-foreground">
-                  <span>• {source.name}</span>
-                  {source.type && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {source.type}
+                <div key={idx} className="text-xs text-muted-foreground flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span>• {source.name}</span>
+                    {source.type && (
+                      <Badge variant="outline" className="text-xs">
+                        {source.type === 'real_estate_portal' ? 'Portal' : 
+                         source.type === 'marketplace' ? 'Marketplace' : 
+                         source.type === 'estimated' ? 'Ước tính' : source.type}
+                      </Badge>
+                    )}
+                  </div>
+                  {source.listingCount && (
+                    <Badge variant="secondary" className="text-xs">
+                      {source.listingCount} tin
                     </Badge>
                   )}
                 </div>
