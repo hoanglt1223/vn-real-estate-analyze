@@ -163,57 +163,12 @@ export default function MapView({
       duration: 1500
     });
 
-    // Tính kích thước polygon phù hợp dựa trên loại địa điểm và giới hạn 1000m²
-    const calculatePolygonSize = (result: any): number => {
-      // Kích thước cơ bản (sẽ điều chỉnh để diện tích <= 1000m²)
-      let baseSize = 0.0002; // Khoảng 400-500m² cho địa điểm trung bình
+    // Tạo circle bán kính 10m xung quanh điểm được chọn
+    const centerPoint = point([lng, lat]);
+    const options = { steps: 32, units: 'meters' as const };
+    const circlePolygon = circle(centerPoint, 10, options); // 10m bán kính
 
-      // Điều chỉnh dựa trên loại địa điểm
-      if (result.place_type) {
-        const placeType = Array.isArray(result.place_type) ? result.place_type[0] : result.place_type;
-
-        switch (placeType) {
-          case 'address':
-          case 'poi':
-            baseSize = 0.0001; // Địa điểm cụ thể rất nhỏ
-            break;
-          case 'neighborhood':
-            baseSize = 0.0003; // Khu phố nhỏ
-            break;
-          case 'locality':
-          case 'place':
-            baseSize = 0.0004; // Địa điểm lớn hơn
-            break;
-          default:
-            baseSize = 0.0002; // Mặc định
-        }
-      }
-
-      // Điều chỉnh nếu có bounding box
-      if (result.bbox && Array.isArray(result.bbox) && result.bbox.length === 4) {
-        const bboxWidth = Math.abs(result.bbox[2] - result.bbox[0]);
-        const bboxHeight = Math.abs(result.bbox[3] - result.bbox[1]);
-        const avgSize = (bboxWidth + bboxHeight) / 4;
-
-        // Sử dụng kích thước từ bbox nhưng không quá lớn
-        baseSize = Math.min(avgSize, 0.0003);
-      }
-
-      // Giới hạn tối đa để đảm bảo diện tích <= 1000m²
-      // 1 độ dài ≈ 111km, 0.001 độ ≈ 111m, diện tích ≈ 12321m²
-      // Để có diện tích <= 1000m², kích thước tối đa ≈ 0.00028
-      const maxSize = 0.00028;
-      return Math.min(baseSize, maxSize);
-    };
-
-    const size = calculatePolygonSize(result);
-    const polygonCoords = [
-      [lng - size, lat - size],
-      [lng + size, lat - size],
-      [lng + size, lat + size],
-      [lng - size, lat + size],
-      [lng - size, lat - size]
-    ];
+    const polygonCoords = circlePolygon.geometry.coordinates[0];
 
     draw.current.deleteAll();
     const feature = {

@@ -160,72 +160,55 @@ export async function analyzeProperty(data: any) {
 }
 
 export async function searchLocations(query: string, limit: number = 10) {
-  // Use Mapbox Geocoding API (not Searchbox API) - this worked before
+  // COMPREHENSIVE SEARCH: Use ALL Mapbox APIs for maximum results
   const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
   if (!token) {
     console.error('Mapbox token not found');
     return [];
   }
 
-  const MAPBOX_API_BASE = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
-  const url = `${MAPBOX_API_BASE}/${encodeURIComponent(query)}.json?access_token=${token}&limit=${limit}&country=VN&language=vi&types=address,place,poi,locality,neighborhood,region,postcode,district,country`;
-
-  console.log(`Fetching Mapbox Geocoding results for: "${query}" with URL: ${url}`);
+  console.log(`🚀 COMPREHENSIVE SEARCH for: "${query}" with limit ${limit}`);
 
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error(`Mapbox Geocoding API error: ${response.status} ${response.statusText}`);
-      return [];
-    }
-    const data = await response.json();
+    // API 1: Geocoding API (most reliable) - 50% of results
+    const geocodingPromise = fetchMapboxGeocoding(query, Math.ceil(limit * 0.5), token);
 
-    if (!data.features || !Array.isArray(data.features)) {
-      console.error('Invalid Mapbox Geocoding response:', data);
-      return [];
-    }
+    // API 2: Searchbox API (modern, session-based) - 30% of results
+    const searchboxPromise = fetchMapboxSearchbox(query, Math.ceil(limit * 0.3), token);
 
-    console.log(`Mapbox Geocoding returned ${data.features.length} results for "${query}"`);
+    // API 3: Places API (for POIs) - 20% of results
+    const placesPromise = fetchMapboxPlaces(query, Math.ceil(limit * 0.2), token);
 
-    const results = data.features.map((feature: any, i: number) => {
-      // Map Mapbox place types to our interface types
-      const firstType = Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : 'place';
-      let mappedType: string = 'place';
+    // Execute all APIs in parallel
+    const [geocodingResults, searchboxResults, placesResults] = await Promise.allSettled([
+      geocodingPromise,
+      searchboxPromise,
+      placesPromise
+    ]);
 
-      switch (firstType) {
-        case 'address': mappedType = 'address'; break;
-        case 'poi': mappedType = 'poi'; break;
-        case 'locality': mappedType = 'locality'; break;
-        case 'neighborhood': mappedType = 'neighborhood'; break;
-        case 'region': mappedType = 'province'; break;
-        case 'postcode': mappedType = 'postcode'; break;
-        case 'district': mappedType = 'district'; break;
-        case 'country': mappedType = 'country'; break;
-        case 'place':
-        default:
-          mappedType = 'place';
-          break;
-      }
+    const geocoding = geocodingResults.status === 'fulfilled' ? geocodingResults.value : [];
+    const searchbox = searchboxResults.status === 'fulfilled' ? searchboxResults.value : [];
+    const places = placesResults.status === 'fulfilled' ? placesResults.value : [];
 
-      const fullName = feature.place_name || feature.text || query;
-      const name = feature.text || fullName;
+    console.log(`📊 API Results - Geocoding: ${geocoding.length}, Searchbox: ${searchbox.length}, Places: ${places.length}`);
 
-      return {
-        name,
-        fullName,
-        type: mappedType,
-        code: 100000 + i,
-        geocodeQuery: fullName,
-        mapboxId: feature.id,
-        province: feature.context?.find((c: any) => c.id.startsWith('region'))?.text,
-        district: feature.context?.find((c: any) => c.id.startsWith('district'))?.text
-      };
-    });
+    // Combine all results
+    const allResults = [...geocoding, ...searchbox, ...places];
 
-    console.log('Processed geocoding results:', results.slice(0, 3).map((r: any) => `${r.name} (${r.type})`));
-    return results;
+    // Deduplicate by name/location
+    const deduplicated = deduplicateResults(allResults);
+
+    // Sort by relevance (exact matches first, then starts with, then contains)
+    const sorted = sortResultsByRelevance(deduplicated, query);
+
+    const finalResults = sorted.slice(0, limit);
+
+    console.log(`🎯 FINAL RESULTS: ${finalResults.length} unique locations`);
+    console.log('Sample results:', finalResults.slice(0, 3).map((r: any) => `${r.name} (${r.type})`));
+
+    return finalResults;
   } catch (error) {
-    console.error('Error fetching Mapbox Geocoding suggestions:', error);
+    console.error('Error in comprehensive search:', error);
     return [];
   }
 }
@@ -264,17 +247,230 @@ export async function retrieveLocation(id: string, sessionToken?: string) {
 }
 
 export async function geocodeLocationCached(query: string) {
-  // Mock geocoding
-  return {
-    query,
-    lat: 21.0285,
-    lng: 105.8542,
-    name: query,
-    address: query
-  };
+  // Real geocoding using Mapbox Geocoding API
+  const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+  if (!token) {
+    console.error('Mapbox token not found for geocoding');
+    return null;
+  }
+
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=VN&language=vi&limit=1`;
+
+  try {
+    console.log(`🗺️ Geocoding location: "${query}"`);
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`Geocoding API error: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data.features || !Array.isArray(data.features) || data.features.length === 0) {
+      console.error('No geocoding results found for:', query);
+      return null;
+    }
+
+    const feature = data.features[0];
+    const [lng, lat] = feature.geometry.coordinates;
+
+    console.log(`✅ Geocoded "${query}" to [${lat}, ${lng}]`);
+
+    return {
+      coordinates: [lng, lat], // [lng, lat] format
+      placeName: feature.place_name || query,
+      placeType: Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : 'location',
+      context: feature.text || undefined,
+      bbox: feature.bbox
+    };
+  } catch (error) {
+    console.error('Error in geocodeLocationCached:', error);
+    return null;
+  }
 }
 
 export async function searchCategory(category: string, options: any = {}) {
   // Mock category search
   return [];
+}
+
+// ============ HELPER FUNCTIONS FOR COMPREHENSIVE SEARCH ============
+
+// API 1: Mapbox Geocoding (forward geocoding)
+async function fetchMapboxGeocoding(query: string, limit: number, token: string): Promise<any[]> {
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&limit=${limit}&country=VN&language=vi&types=address,place,poi,locality`;
+
+  try {
+    console.log(`🔍 Geocoding API: ${query}`);
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    const data = await response.json();
+
+    if (!data.features || !Array.isArray(data.features)) return [];
+
+    return data.features.map((feature: any, i: number) => {
+      const firstType = Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : 'place';
+      const fullName = feature.place_name || feature.text || query;
+      const name = feature.text || fullName;
+      const [lng, lat] = feature.geometry.coordinates;
+
+      return {
+        name,
+        fullName,
+        type: mapMapboxType(firstType),
+        code: 200000 + i,
+        geocodeQuery: fullName,
+        mapboxId: feature.id,
+        source: 'geocoding',
+        relevance: feature.relevance || 0.5,
+        province: feature.context?.find((c: any) => c.id.startsWith('region'))?.text,
+        district: feature.context?.find((c: any) => c.id.startsWith('district'))?.text,
+        // Include coordinates directly for faster selection
+        lat,
+        lng
+      };
+    });
+  } catch (error) {
+    console.error('Geocoding API error:', error);
+    return [];
+  }
+}
+
+// API 2: Mapbox Searchbox (modern search)
+async function fetchMapboxSearchbox(query: string, limit: number, token: string): Promise<any[]> {
+  const url = `https://api.mapbox.com/search/searchbox/v1/suggest?q=${encodeURIComponent(query)}&access_token=${token}&limit=${limit}&country=VN&language=vi&types=address,place,poi,locality`;
+
+  try {
+    console.log(`🔍 Searchbox API: ${query}`);
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    const data = await response.json();
+
+    if (!data.suggestions || !Array.isArray(data.suggestions)) return [];
+
+    return data.suggestions.map((s: any, i: number) => ({
+      name: s.name || s.feature_name || query,
+      fullName: s.place_formatted || s.name || query,
+      type: mapMapboxType(s.feature_type),
+      code: 300000 + i,
+      geocodeQuery: s.place_formatted || s.name || query,
+      mapboxId: s.mapbox_id || s.id,
+      source: 'searchbox',
+      relevance: 0.7, // Searchbox typically has good relevance
+      province: s.context?.find((c: any) => c.id.startsWith('region'))?.text,
+      district: s.context?.find((c: any) => c.id.startsWith('district'))?.text
+    }));
+  } catch (error) {
+    console.error('Searchbox API error:', error);
+    return [];
+  }
+}
+
+// API 3: Mapbox Places (for comprehensive POI search)
+async function fetchMapboxPlaces(query: string, limit: number, token: string): Promise<any[]> {
+  // Use Geocoding with POI focus as Places API alternative
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&limit=${limit}&country=VN&language=vi&types=poi,address`;
+
+  try {
+    console.log(`🔍 Places/POI API: ${query}`);
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    const data = await response.json();
+
+    if (!data.features || !Array.isArray(data.features)) return [];
+
+    return data.features.map((feature: any, i: number) => {
+      const firstType = Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : 'poi';
+      const fullName = feature.place_name || feature.text || query;
+      const name = feature.text || fullName;
+
+      return {
+        name,
+        fullName,
+        type: firstType === 'poi' ? 'poi' : mapMapboxType(firstType),
+        code: 400000 + i,
+        geocodeQuery: fullName,
+        mapboxId: feature.id,
+        source: 'places',
+        relevance: feature.relevance || 0.6,
+        province: feature.context?.find((c: any) => c.id.startsWith('region'))?.text,
+        district: feature.context?.find((c: any) => c.id.startsWith('district'))?.text,
+        coordinates: feature.center?.reverse()
+      };
+    });
+  } catch (error) {
+    console.error('Places API error:', error);
+    return [];
+  }
+}
+
+// Helper: Map Mapbox types to our interface types - focus on POI > Address > Place > Locality
+function mapMapboxType(mapboxType: string): string {
+  switch (mapboxType) {
+    case 'address': return 'address';
+    case 'poi': return 'poi';
+    case 'locality': return 'locality';
+    case 'place':
+    default:
+      return 'place';
+  }
+}
+
+// Helper: Deduplicate results by name and type
+function deduplicateResults(results: any[]): any[] {
+  const seen = new Set();
+  return results.filter(result => {
+    const key = `${result.name.toLowerCase()}-${result.type}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+// Helper: Sort results by relevance
+function sortResultsByRelevance(results: any[], query: string): any[] {
+  const queryLower = query.toLowerCase();
+
+  return results.sort((a, b) => {
+    // Exact matches first
+    const aExact = a.name.toLowerCase() === queryLower;
+    const bExact = b.name.toLowerCase() === queryLower;
+    if (aExact && !bExact) return -1;
+    if (!aExact && bExact) return 1;
+
+    // Starts with matches
+    const aStarts = a.name.toLowerCase().startsWith(queryLower);
+    const bStarts = b.name.toLowerCase().startsWith(queryLower);
+    if (aStarts && !bStarts) return -1;
+    if (!aStarts && bStarts) return 1;
+
+    // Use API relevance score if available
+    const aRelevance = a.relevance || 0;
+    const bRelevance = b.relevance || 0;
+    if (aRelevance !== bRelevance) return bRelevance - aRelevance;
+
+    // Priority order for types - POIs > Addresses > Places > Localities
+    const typePriority = {
+      'poi': 5,      // Highest priority - businesses, shops, restaurants
+      'address': 4,  // High priority - specific addresses
+      'place': 3,    // Medium priority - landmarks, places of interest
+      'locality': 2, // Lower priority - areas, zones
+      'neighborhood': 1, // Lowest priority - neighborhoods
+      'district': 0,
+      'province': 0,
+      'region': 0,
+      'postcode': 0,
+      'country': 0
+    };
+
+    const aPriority = typePriority[a.type] || 0;
+    const bPriority = typePriority[b.type] || 0;
+
+    if (aPriority !== bPriority) return bPriority - aPriority;
+
+    // Finally alphabetical
+    return a.name.localeCompare(b.name, 'vi');
+  });
 }

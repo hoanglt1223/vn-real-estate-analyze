@@ -12,6 +12,9 @@ interface VNSearchResult {
   code: number;
   geocodeQuery: string;
   mapboxId?: string;
+  // Optional coordinates for faster selection
+  lat?: number;
+  lng?: number;
 }
 
 interface GeocodedResult {
@@ -65,7 +68,7 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
       try {
         const data: VNSearchResult[] = await apiSearchLocations(query, {
           limit: 20,
-          types: 'address,place,poi,locality,neighborhood,region,postcode,district,country',
+          types: 'address,place,poi,locality',
           sessionToken
         });
         
@@ -97,27 +100,52 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
     setIsGeocoding(true);
 
     try {
-      const retrieved = result.mapboxId ? await apiRetrieveLocation(result.mapboxId, sessionToken) : await fetch(API_ENDPOINTS.locationsGeocode, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: result.geocodeQuery })
-      }).then(r => r.json());
+      let coords: [number, number];
+      let bbox = undefined;
 
-      // Transform to expected format for map
-      const coords: [number, number] = (retrieved.coordinates as [number, number]) || (retrieved?.coordinates as [number, number]);
+      // First try to use direct coordinates if available (fastest)
+      if (result.lat !== undefined && result.lng !== undefined) {
+        coords = [result.lng, result.lat];
+        console.log(`✅ Using direct coordinates for "${result.name}": [${result.lat}, ${result.lng}]`);
+      } else {
+        // Fallback to geocoding API
+        console.log(`🗺️ Geocoding "${result.geocodeQuery}"...`);
+        const retrieved = await fetch(API_ENDPOINTS.locationsGeocode, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: result.geocodeQuery })
+        }).then(r => r.json());
+
+        console.log('Geocoding result for:', result.geocodeQuery, retrieved);
+
+        // Handle different coordinate formats from API
+        if (retrieved.coordinates && Array.isArray(retrieved.coordinates)) {
+          coords = retrieved.coordinates as [number, number];
+        } else if (retrieved.center && Array.isArray(retrieved.center)) {
+          coords = retrieved.center as [number, number];
+        } else if (retrieved.lat && retrieved.lng) {
+          coords = [retrieved.lng, retrieved.lat]; // Mapbox expects [lng, lat]
+        } else {
+          throw new Error('No coordinates found in geocoding response');
+        }
+
+        bbox = retrieved.bbox;
+      }
+
       const geocodedResult: GeocodedResult = {
         id: `${result.code}-${result.type}`,
         place_name: result.fullName,
         center: coords,
         place_type: result.type,
-        bbox: retrieved.bbox
+        bbox: bbox
       };
 
+      console.log('✅ Final geocoded result:', geocodedResult);
       onSelect(geocodedResult);
     } catch (error) {
-      console.error('Geocoding error:', error);
-      // Fallback: still try to display the location name even if geocoding fails
-      alert('Không thể xác định tọa độ cho địa điểm này. Vui lòng thử lại.');
+      console.error('❌ Geocoding error:', error);
+      console.error('Failed result:', result);
+      alert(`Không thể xác định tọa độ cho "${result.fullName}". Vui lòng thử lại.`);
     } finally {
       setIsGeocoding(false);
     }
