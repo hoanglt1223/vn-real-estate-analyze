@@ -19,6 +19,7 @@ import { generatePDF } from '@/lib/pdfExport';
 
 export default function AnalysisPage() {
   const { toast } = useToast();
+  const mapRef = useRef<any>(null);
   const [propertyData, setPropertyData] = useState({
     area: 0,
     orientation: '',
@@ -117,6 +118,16 @@ export default function AnalysisPage() {
       coordinates: data.coordinates,
       center: data.center
     });
+  };
+
+  const handleAmenityClick = (amenity: any) => {
+    if (mapRef.current && mapRef.current.flyTo) {
+      mapRef.current.flyTo({
+        center: [amenity.lon, amenity.lat],
+        zoom: 17,
+        duration: 1000
+      });
+    }
   };
 
   const handleAnalyze = async (forceRadius?: number, forceCategories?: string[], forceLayers?: string[], forceIncludeSmallShops?: boolean) => {
@@ -269,10 +280,6 @@ export default function AnalysisPage() {
                 onLayerChange={handleLayerChange}
               />
 
-              {analysisResults && (
-                <AmenityStatistics amenities={analysisResults.amenities || []} />
-              )}
-
               {propertyData.area > 0 && (
                 <Button
                   onClick={() => handleAnalyze()}
@@ -311,6 +318,7 @@ export default function AnalysisPage() {
               selectedCategories={selectedCategories}
               selectedLayers={selectedLayers}
               infrastructure={analysisResults?.infrastructure}
+              mapRef={mapRef}
             />
           </div>
 
@@ -357,7 +365,10 @@ export default function AnalysisPage() {
                   summary={analysisResults.aiAnalysis.summary}
                 />
                 <MarketPriceCard data={analysisResults.marketData} />
-                <AmenityStatistics amenities={analysisResults.amenities || []} />
+                <AmenityStatistics
+                  amenities={analysisResults.amenities || []}
+                  onAmenityClick={handleAmenityClick}
+                />
                 <AmenityList amenities={analysisResults.amenities} />
                 <RiskAssessmentCard risks={analysisResults.risks} overallRiskLevel={analysisResults.overallRiskLevel} />
               </div>

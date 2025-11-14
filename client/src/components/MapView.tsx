@@ -39,6 +39,7 @@ interface MapViewProps {
   selectedCategories?: string[];
   selectedLayers?: string[];
   infrastructure?: any;
+  mapRef?: React.RefObject<any>;
 }
 
 const categoryColors: Record<string, string> = {
@@ -117,15 +118,16 @@ function getEducationTypeLabel(amenity: Amenity): string {
   return 'Cơ sở giáo dục';
 }
 
-export default function MapView({ 
-  onPolygonChange, 
-  center = [106.6297, 10.8231], 
+export default function MapView({
+  onPolygonChange,
+  center = [106.6297, 10.8231],
   zoom = 12,
   amenities = [],
   radius = 1000,
   selectedCategories = [],
   selectedLayers = [],
-  infrastructure
+  infrastructure,
+  mapRef
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -358,6 +360,11 @@ export default function MapView({
         console.warn('Error adding radius layers:', e);
       }
     };
+
+    // Assign map instance to ref if provided
+    if (mapRef && 'current' in mapRef) {
+      (mapRef as any).current = map.current;
+    }
 
     map.current.on('load', () => {
       setIsLoaded(true);

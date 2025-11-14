@@ -23,6 +23,12 @@ interface Amenity {
     school_type?: string;
     isced_level?: string;
     operator_type?: string;
+    healthcare?: string;
+    leisure?: string;
+    tourism?: string;
+    aeroway?: string;
+    railway?: string;
+    highway?: string;
   };
 }
 

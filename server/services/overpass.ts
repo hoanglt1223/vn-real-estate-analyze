@@ -335,18 +335,26 @@ function getDefaultName(tags: any, category: string): string {
   const type = tags?.amenity || tags?.shop || tags?.leisure || tags?.aeroway || tags?.railway || tags?.highway;
   const categoryNames: Record<string, string> = {
     education: 'Trường học',
-    healthcare: 'Cơ sở y tế',
     shopping: 'Cửa hàng',
     entertainment: 'Giải trí',
     transport: 'Điểm giao thông'
   };
-  
+
+  if (category === 'healthcare') {
+    if (tags?.amenity === 'hospital' || tags?.healthcare === 'hospital') return 'Bệnh viện';
+    if (tags?.amenity === 'clinic') return 'Phòng khám';
+    if (tags?.amenity === 'doctors') return 'Phòng khám bác sĩ';
+    if (tags?.amenity === 'dentist') return 'Phòng khám nha khoa';
+    if (tags?.amenity === 'pharmacy') return 'Nhà thuốc';
+    return 'Cơ sở y tế';
+  }
+
   if (category === 'transport') {
     if (tags?.aeroway === 'aerodrome') return 'Sân bay';
     if (tags?.railway === 'station') return 'Nhà ga';
     if (tags?.amenity === 'bus_station') return 'Bến xe buýt';
     if (tags?.highway === 'bus_stop') return 'Trạm xe buýt';
   }
-  
+
   return categoryNames[category] || 'Địa điểm';
 }

@@ -15,6 +15,7 @@ interface Amenity {
 
 interface AmenityStatisticsProps {
   amenities: Amenity[];
+  onAmenityClick?: (amenity: Amenity) => void;
 }
 
 const categoryNames: Record<string, string> = {
@@ -35,7 +36,7 @@ const categoryColors: Record<string, string> = {
   infrastructure: 'bg-gray-500'
 };
 
-export default function AmenityStatistics({ amenities }: AmenityStatisticsProps) {
+export default function AmenityStatistics({ amenities, onAmenityClick }: AmenityStatisticsProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
   const filteredAmenities = selectedCategory === 'all' 
     ? amenities 
@@ -137,7 +138,8 @@ export default function AmenityStatistics({ amenities }: AmenityStatisticsProps)
                   {topAmenities.map((amenity, index) => (
                     <div
                       key={amenity.id}
-                      className="flex items-start justify-between text-xs p-2 rounded-md bg-muted/50"
+                      className="flex items-start justify-between text-xs p-2 rounded-md bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
+                      onClick={() => onAmenityClick?.(amenity)}
                       data-testid={`nearest-amenity-${index}`}
                     >
                       <div className="flex-1 min-w-0">
