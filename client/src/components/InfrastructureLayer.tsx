@@ -174,28 +174,32 @@ export default function InfrastructureLayer({
               {group.items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between p-3 rounded-md border hover-elevate transition-colors"
+                  className={`flex items-center justify-between p-3 rounded-md border hover-elevate transition-all cursor-pointer ${
+                    selectedLayers.includes(item.id)
+                      ? 'bg-primary/10 border-primary/30 shadow-sm'
+                      : 'hover:bg-muted/50'
+                  }`}
+                  onClick={() => handleLayerToggle(item.id)}
+                  data-testid={`layer-item-${item.id}`}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <Checkbox
                       id={item.id}
                       checked={selectedLayers.includes(item.id)}
                       onCheckedChange={() => handleLayerToggle(item.id)}
+                      onClick={(e) => e.stopPropagation()}
                       data-testid={`checkbox-${item.id}`}
                     />
-                    <div className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       <div className={getRiskColor(item.risk)}>
                         {item.icon}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <Label
-                          htmlFor={item.id}
-                          className="cursor-pointer text-sm font-medium"
-                        >
+                        <div className="text-sm font-medium select-none">
                           {item.name}
-                        </Label>
+                        </div>
                         {item.description && (
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-1 select-none">
                             {item.description}
                           </p>
                         )}
@@ -203,7 +207,7 @@ export default function InfrastructureLayer({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 ml-2">
+                  <div className="flex items-center gap-2 ml-2" onClick={(e) => e.stopPropagation()}>
                     {item.risk && (
                       <Badge
                         variant={getRiskBadgeColor(item.risk)}

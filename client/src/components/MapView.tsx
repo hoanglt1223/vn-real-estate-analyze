@@ -48,6 +48,7 @@ const categoryColors: Record<string, string> = {
   shopping: '#10B981',
   entertainment: '#F59E0B',
   transport: '#8B5CF6',
+  infrastructure: '#6B7280',
   default: '#6B7280'
 };
 
@@ -57,6 +58,7 @@ const categoryIcons: Record<string, string> = {
   shopping: '🛒',
   entertainment: '🎭',
   transport: '🚉',
+  infrastructure: '🏗️',
   default: '📍'
 };
 

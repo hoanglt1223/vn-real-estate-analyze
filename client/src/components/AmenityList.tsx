@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { School, Hospital, ShoppingCart, Dumbbell, MapPin, Star, Store, Clock } from 'lucide-react';
+import { School, Hospital, ShoppingCart, Dumbbell, MapPin, Star, Store, Clock, Building } from 'lucide-react';
 
 interface Amenity {
   id: string;
@@ -42,7 +42,8 @@ const categoryIcons: Record<string, React.ReactNode> = {
   healthcare: <Hospital className="w-4 h-4" />,
   shopping: <ShoppingCart className="w-4 h-4" />,
   entertainment: <Dumbbell className="w-4 h-4" />,
-  transport: <MapPin className="w-4 h-4" />
+  transport: <MapPin className="w-4 h-4" />,
+  infrastructure: <Building className="w-4 h-4" />
 };
 
 const categoryNames: Record<string, string> = {
@@ -50,7 +51,8 @@ const categoryNames: Record<string, string> = {
   healthcare: 'Y tế',
   shopping: 'Mua sắm',
   entertainment: 'Giải trí',
-  transport: 'Giao thông'
+  transport: 'Giao thông',
+  infrastructure: 'Hạ tầng'
 };
 
 function getEducationTypeLabel(amenity: Amenity): string {

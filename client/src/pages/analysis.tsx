@@ -98,6 +98,49 @@ export default function AnalysisPage() {
     }
   };
 
+  // Convert infrastructure data to amenities format for statistics
+  const convertInfrastructureToAmenities = (infrastructure: any): any[] => {
+    if (!infrastructure) return [];
+
+    const infrastructureAmenities: any[] = [];
+    const layerNames: Record<string, string> = {
+      roads: 'Đường lớn',
+      metro: 'Trạm Metro',
+      metro_lines: 'Tuyến Metro',
+      bus_routes: 'Tuyến xe buýt',
+      industrial: 'Khu công nghiệp',
+      power: 'Trạm điện',
+      cemetery: 'Nghĩa trang',
+      water: 'Sông & kênh'
+    };
+
+    Object.entries(infrastructure).forEach(([layer, items]: [string, any]) => {
+      if (Array.isArray(items) && layerNames[layer]) {
+        items.forEach((item: any, index: number) => {
+          if (item.lat && item.lon) {
+            infrastructureAmenities.push({
+              id: `infra-${layer}-${index}`,
+              name: item.name || layerNames[layer] || layer,
+              category: 'infrastructure',
+              lat: item.lat,
+              lon: item.lon,
+              distance: item.distance
+            });
+          }
+        });
+      }
+    });
+
+    return infrastructureAmenities;
+  };
+
+  // Combine regular amenities with infrastructure data for statistics
+  const getAllAmenities = () => {
+    const regularAmenities = analysisResults?.amenities || [];
+    const infrastructureAmenities = convertInfrastructureToAmenities(analysisResults?.infrastructure);
+    return [...regularAmenities, ...infrastructureAmenities];
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -313,7 +356,7 @@ export default function AnalysisPage() {
               center={[106.6297, 10.8231]}
               zoom={12}
               onPolygonChange={handlePolygonChange}
-              amenities={analysisResults?.amenities || []}
+              amenities={getAllAmenities()}
               radius={radius}
               selectedCategories={selectedCategories}
               selectedLayers={selectedLayers}
@@ -343,10 +386,10 @@ export default function AnalysisPage() {
                   </TabsContent>
                   <TabsContent value="amenities" className="p-4 space-y-4">
                     <AmenityStatistics
-                      amenities={analysisResults.amenities}
+                      amenities={getAllAmenities()}
                       onAmenityClick={handleAmenityClick}
                     />
-                    <AmenityList amenities={analysisResults.amenities} />
+                    <AmenityList amenities={getAllAmenities()} />
                   </TabsContent>
                   <TabsContent value="risk" className="p-4">
                     <RiskAssessmentCard risks={analysisResults.risks} overallRiskLevel={analysisResults.overallRiskLevel} />
@@ -370,10 +413,10 @@ export default function AnalysisPage() {
                 />
                 <MarketPriceCard data={analysisResults.marketData} />
                 <AmenityStatistics
-                  amenities={analysisResults.amenities || []}
+                  amenities={getAllAmenities()}
                   onAmenityClick={handleAmenityClick}
                 />
-                <AmenityList amenities={analysisResults.amenities} />
+                <AmenityList amenities={getAllAmenities()} />
                 <RiskAssessmentCard risks={analysisResults.risks} overallRiskLevel={analysisResults.overallRiskLevel} />
               </div>
             </ScrollArea>
