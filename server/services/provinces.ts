@@ -123,23 +123,29 @@ export async function searchLocations(query: string, limit: number = 10): Promis
     }
   }
 
-  // Sort by relevance (exact matches first, then partial)
+  // Sort by relevance (exact matches first, then partial) - no type preference
   results.sort((a, b) => {
     const aExact = a.name.toLowerCase() === queryLower;
     const bExact = b.name.toLowerCase() === queryLower;
     if (aExact && !bExact) return -1;
     if (!aExact && bExact) return 1;
-    
+
     const aStarts = a.name.toLowerCase().startsWith(queryLower);
     const bStarts = b.name.toLowerCase().startsWith(queryLower);
     if (aStarts && !bStarts) return -1;
     if (!aStarts && bStarts) return 1;
-    
-    // Prefer provinces over districts
-    if (a.type === 'province' && b.type !== 'province') return -1;
-    if (a.type !== 'province' && b.type === 'province') return 1;
-    
-    return 0;
+
+    // No type preference - mix all types for diversity
+    // Alternate between different types for better variety
+    const typeOrder = ['province', 'district', 'ward'];
+    const aTypeIndex = typeOrder.indexOf(a.type);
+    const bTypeIndex = typeOrder.indexOf(b.type);
+
+    if (aTypeIndex !== bTypeIndex) {
+      return aTypeIndex - bTypeIndex;
+    }
+
+    return a.name.localeCompare(b.name, 'vi');
   });
 
   return results.slice(0, limit);

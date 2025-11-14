@@ -57,7 +57,9 @@ export async function geocodeLocation(query: string): Promise<GeocodingResult | 
 export interface LocationSuggestion {
   name: string;
   fullName: string;
-  type: 'address' | 'place' | 'poi' | 'locality' | 'neighborhood';
+  type: 'province' | 'district' | 'ward' | 'address' | 'place' | 'poi' | 'locality' | 'neighborhood' | 'region' | 'postcode';
+  province?: string;
+  district?: string;
   code: number;
   geocodeQuery: string;
   mapboxId?: string;
@@ -99,14 +101,36 @@ export async function suggestLocations(query: string, options?: { limit?: number
   const response = await fetch(url);
   if (!response.ok) return [];
   const data = await response.json();
-  const suggestions: LocationSuggestion[] = Array.isArray(data.suggestions) ? data.suggestions.map((s: any, i: number) => ({
-    name: s.name || s.feature_name || query,
-    fullName: s.place_formatted || s.name || query,
-    type: (s.feature_type || 'place') as LocationSuggestion['type'],
-    code: 100000 + i,
-    geocodeQuery: s.place_formatted || s.name || query,
-    mapboxId: s.mapbox_id || s.id
-  })) : [];
+  const suggestions: LocationSuggestion[] = Array.isArray(data.suggestions) ? data.suggestions.map((s: any, i: number) => {
+    // Map Mapbox feature types to our interface types
+    let mappedType: LocationSuggestion['type'] = 'place';
+    const featureType = s.feature_type || '';
+
+    switch (featureType) {
+      case 'address': mappedType = 'address'; break;
+      case 'poi': mappedType = 'poi'; break;
+      case 'locality': mappedType = 'locality'; break;
+      case 'neighborhood': mappedType = 'neighborhood'; break;
+      case 'region': mappedType = 'province'; break;
+      case 'postcode': mappedType = 'postcode'; break;
+      case 'district': mappedType = 'district'; break;
+      case 'place':
+      default:
+        mappedType = 'place';
+        break;
+    }
+
+    return {
+      name: s.name || s.feature_name || query,
+      fullName: s.place_formatted || s.name || query,
+      type: mappedType,
+      province: s.context?.find((c: any) => c.id.startsWith('region'))?.text,
+      district: s.context?.find((c: any) => c.id.startsWith('district'))?.text,
+      code: 100000 + i,
+      geocodeQuery: s.place_formatted || s.name || query,
+      mapboxId: s.mapbox_id || s.id
+    };
+  }) : [];
 
   // Cache only if no sessionToken is provided
   if (!options?.sessionToken) {

@@ -192,7 +192,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           suggestLocations(q, { limit: 20, sessionToken, types, proximity }).catch(() => []),
           searchLocations(q, 20).catch(() => [])
         ]);
-        const combined = [...mapboxSuggestions, ...vnAdmin].slice(0, 20);
+        // Interleave results for better diversity
+        const combined: any[] = [];
+        const maxLength = Math.max(mapboxSuggestions.length, vnAdmin.length);
+
+        for (let i = 0; i < maxLength && combined.length < 20; i++) {
+          if (i < mapboxSuggestions.length) combined.push(mapboxSuggestions[i]);
+          if (i < vnAdmin.length) combined.push(vnAdmin[i]);
+        }
+
+        console.log(`Search for "${q}": Mapbox(${mapboxSuggestions.length}) + VNAdmin(${vnAdmin.length}) = Total(${combined.length})`);
+        console.log('Mapbox suggestions sample:', mapboxSuggestions.slice(0, 2));
+        console.log('VN Admin suggestions sample:', vnAdmin.slice(0, 2));
+        console.log('Combined results by type:', combined.map(r => `${r.name} (${r.type})`).slice(0, 10));
         return res.json(combined);
       }
 

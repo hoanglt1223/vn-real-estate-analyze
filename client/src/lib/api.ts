@@ -118,8 +118,13 @@ export async function deleteProperty(id: string) {
   return response.json();
 }
 
-export async function searchLocations(q: string) {
-  const response = await fetch(API_ENDPOINTS.locationsSearch(q));
+export async function searchLocations(q: string, opts?: { limit?: number; types?: string; sessionToken?: string; proximity?: string }) {
+  const params = new URLSearchParams({ q });
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.types) params.set('types', opts.types);
+  if (opts?.sessionToken) params.set('sessionToken', opts.sessionToken);
+  if (opts?.proximity) params.set('proximity', opts.proximity);
+  const response = await fetch(`${API_BASE}?action=locations-search&${params.toString()}`);
   if (!response.ok) throw new Error('Failed to search locations');
   return response.json();
 }

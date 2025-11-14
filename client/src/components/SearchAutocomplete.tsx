@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Loader2, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { API_ENDPOINTS, suggestLocations as apiSuggestLocations, retrieveLocation as apiRetrieveLocation } from '@/lib/api';
+import { API_ENDPOINTS, searchLocations as apiSearchLocations, retrieveLocation as apiRetrieveLocation } from '@/lib/api';
 
 interface VNSearchResult {
   name: string;
@@ -63,7 +63,7 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
 
     debounceTimer.current = setTimeout(async () => {
       try {
-        const data: VNSearchResult[] = await apiSuggestLocations(query, {
+        const data: VNSearchResult[] = await apiSearchLocations(query, {
           limit: 20,
           types: 'address,place,poi,locality,neighborhood,region,postcode,district',
           sessionToken
