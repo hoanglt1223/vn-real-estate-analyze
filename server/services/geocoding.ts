@@ -57,7 +57,7 @@ export async function geocodeLocation(query: string): Promise<GeocodingResult | 
 export interface LocationSuggestion {
   name: string;
   fullName: string;
-  type: 'province' | 'district' | 'ward' | 'address' | 'place' | 'poi' | 'locality' | 'neighborhood' | 'region' | 'postcode';
+  type: 'province' | 'district' | 'ward' | 'address' | 'place' | 'poi' | 'locality' | 'neighborhood' | 'region' | 'postcode' | 'country';
   province?: string;
   district?: string;
   code: number;
@@ -70,7 +70,7 @@ export async function suggestLocations(query: string, options?: { limit?: number
   const cacheKey = generateCacheKey('locationSuggestions', {
     query: query.toLowerCase().trim(),
     limit: options?.limit ?? 10,
-    types: options?.types ?? 'address,place,poi,locality,neighborhood,region,postcode,district',
+    types: options?.types ?? 'address,place,poi,locality,neighborhood,region,postcode,district,country',
     proximity: options?.proximity,
     country: options?.country ?? 'VN',
     language: options?.language ?? 'vi'
@@ -89,7 +89,7 @@ export async function suggestLocations(query: string, options?: { limit?: number
   if (!token) return [];
   const limit = options?.limit ?? 10;
   const sessionToken = options?.sessionToken ?? undefined;
-  const types = options?.types ?? 'address,place,poi,locality,neighborhood,region,postcode,district';
+  const types = options?.types ?? 'address,place,poi,locality,neighborhood,region,postcode,district,country';
   const proximity = options?.proximity ? `&proximity=${options?.proximity}` : '';
   const country = options?.country ?? 'VN';
   const language = options?.language ?? 'vi';
@@ -114,6 +114,7 @@ export async function suggestLocations(query: string, options?: { limit?: number
       case 'region': mappedType = 'province'; break;
       case 'postcode': mappedType = 'postcode'; break;
       case 'district': mappedType = 'district'; break;
+      case 'country': mappedType = 'country'; break;
       case 'place':
       default:
         mappedType = 'place';

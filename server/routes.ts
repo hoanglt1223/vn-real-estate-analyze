@@ -5,7 +5,6 @@ import { calculatePropertyMetrics, assessRisks } from "./services/geospatial";
 import { fetchAmenities, fetchInfrastructure } from "./services/overpass";
 import { scrapeMarketPrices } from "./services/scraper";
 import { analyzeProperty } from "./services/ai";
-import { searchLocations } from "./services/provinces";
 import { geocodeLocationCached, suggestLocations, retrieveLocation, searchCategory } from "./services/geocoding";
 import { optimizeAnalysisResponse, createCompressedResponse } from "./utils/responseOptimizer";
 import { prefetchForAnalysis } from "./services/prefetch";
@@ -187,25 +186,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!q || q.length < 2) return res.json([]);
         const sessionToken = (req.query.sessionToken as string) || undefined;
         const proximity = (req.query.proximity as string) || undefined;
-        const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood,region,postcode,district';
-        const [mapboxSuggestions, vnAdmin] = await Promise.all([
-          suggestLocations(q, { limit: 20, sessionToken, types, proximity }).catch(() => []),
-          searchLocations(q, 20).catch(() => [])
-        ]);
-        // Interleave results for better diversity
-        const combined: any[] = [];
-        const maxLength = Math.max(mapboxSuggestions.length, vnAdmin.length);
+        const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood,region,postcode,district,country';
+        const suggestions = await suggestLocations(q, { limit: 20, sessionToken, types, proximity }).catch(() => []);
 
-        for (let i = 0; i < maxLength && combined.length < 20; i++) {
-          if (i < mapboxSuggestions.length) combined.push(mapboxSuggestions[i]);
-          if (i < vnAdmin.length) combined.push(vnAdmin[i]);
-        }
-
-        console.log(`Search for "${q}": Mapbox(${mapboxSuggestions.length}) + VNAdmin(${vnAdmin.length}) = Total(${combined.length})`);
-        console.log('Mapbox suggestions sample:', mapboxSuggestions.slice(0, 2));
-        console.log('VN Admin suggestions sample:', vnAdmin.slice(0, 2));
-        console.log('Combined results by type:', combined.map(r => `${r.name} (${r.type})`).slice(0, 10));
-        return res.json(combined);
+        console.log(`Search for "${q}": Mapbox(${suggestions.length}) results`);
+        console.log('Results sample:', suggestions.slice(0, 3).map(r => `${r.name} (${r.type})`));
+        return res.json(suggestions);
       }
 
       if (req.method === 'GET' && action === 'locations-suggest') {
@@ -213,7 +199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!q || q.length < 2) return res.json([]);
         const limit = parseInt((req.query.limit as string) || '10', 10);
         const sessionToken = (req.query.sessionToken as string) || undefined;
-        const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood,region,postcode,district';
+        const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood,region,postcode,district,country';
         const proximity = (req.query.proximity as string) || undefined;
         const suggestions = await suggestLocations(q, { limit, sessionToken, types, proximity });
         return res.json(suggestions);

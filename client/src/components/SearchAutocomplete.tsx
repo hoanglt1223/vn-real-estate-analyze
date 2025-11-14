@@ -6,7 +6,7 @@ import { API_ENDPOINTS, searchLocations as apiSearchLocations, retrieveLocation 
 interface VNSearchResult {
   name: string;
   fullName: string;
-  type: 'province' | 'district' | 'ward' | 'address' | 'place' | 'poi' | 'locality' | 'neighborhood';
+  type: 'province' | 'district' | 'ward' | 'address' | 'place' | 'poi' | 'locality' | 'neighborhood' | 'region' | 'postcode' | 'country';
   province?: string;
   district?: string;
   code: number;
@@ -65,7 +65,7 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
       try {
         const data: VNSearchResult[] = await apiSearchLocations(query, {
           limit: 20,
-          types: 'address,place,poi,locality,neighborhood,region,postcode,district',
+          types: 'address,place,poi,locality,neighborhood,region,postcode,district,country',
           sessionToken
         });
         
@@ -148,6 +148,22 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
         return 'bg-green-500/10 text-green-700 dark:bg-green-500/20 dark:text-green-300 border-green-500/20';
       case 'ward':
         return 'bg-purple-500/10 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 border-purple-500/20';
+      case 'address':
+        return 'bg-orange-500/10 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300 border-orange-500/20';
+      case 'poi':
+        return 'bg-red-500/10 text-red-700 dark:bg-red-500/20 dark:text-red-300 border-red-500/20';
+      case 'place':
+        return 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 border-indigo-500/20';
+      case 'locality':
+        return 'bg-teal-500/10 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300 border-teal-500/20';
+      case 'neighborhood':
+        return 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300 border-cyan-500/20';
+      case 'region':
+        return 'bg-pink-500/10 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300 border-pink-500/20';
+      case 'postcode':
+        return 'bg-yellow-500/10 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300 border-yellow-500/20';
+      case 'country':
+        return 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-500/20';
       default:
         return 'bg-gray-500/10 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300 border-gray-500/20';
     }
@@ -171,6 +187,12 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
         return 'Khu vực';
       case 'neighborhood':
         return 'Khu phố';
+      case 'region':
+        return 'Vùng';
+      case 'postcode':
+        return 'Mã bưu chính';
+      case 'country':
+        return 'Quốc gia';
       default:
         return type;
     }
