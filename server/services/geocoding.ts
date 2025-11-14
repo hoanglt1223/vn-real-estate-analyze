@@ -76,14 +76,8 @@ export async function suggestLocations(query: string, options?: { limit?: number
     language: options?.language ?? 'vi'
   });
 
-  // Try to get from cache first (skip caching if sessionToken is provided as it's session-specific)
-  if (!options?.sessionToken) {
-    const cachedResult = cache.get(cacheKey);
-    if (cachedResult) {
-      console.log(`Cache hit for location suggestions: ${query}`);
-      return cachedResult;
-    }
-  }
+  // CACHE DISABLED FOR TESTING - Always fetch fresh results
+  console.log(`Cache disabled - fetching fresh results for: ${query}`);
 
   const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
   if (!token) return [];
@@ -133,10 +127,8 @@ export async function suggestLocations(query: string, options?: { limit?: number
     };
   }) : [];
 
-  // Cache only if no sessionToken is provided
-  if (!options?.sessionToken) {
-    cache.set(cacheKey, suggestions, CACHE_TTL.LOCATION_SUGGESTIONS);
-  }
+  // CACHE DISABLED FOR TESTING - Not storing results
+  console.log(`Cache disabled - NOT storing ${suggestions.length} results for: ${query}`);
 
   return suggestions;
 }
@@ -196,11 +188,8 @@ export async function geocodeLocationCached(query: string): Promise<GeocodingRes
   // Generate cache key for geocoding
   const cacheKey = generateCacheKey('geocoding', { query: query.toLowerCase().trim() });
 
-  // Try to get from cache first
-  const cachedResult = cache.get(cacheKey);
-  if (cachedResult !== null) {
-    return cachedResult;
-  }
+  // CACHE DISABLED FOR TESTING - Always fetch fresh
+  console.log(`Cache disabled - fetching fresh geocoding for: ${query}`);
 
   // Cache miss - call the main geocodeLocation function (which also caches)
   return await geocodeLocation(query);

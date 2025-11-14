@@ -186,7 +186,7 @@ export async function fetchAmenities(
   const cachedResult = localCache.get(cacheKey);
   if (cachedResult) {
     console.log(`Cache hit for amenities: ${cacheKey}`);
-    return cachedResult;
+    return cachedResult as any[];
   }
 
   console.log(`Cache miss for amenities: ${cacheKey}`);
@@ -205,7 +205,7 @@ export async function fetchAmenities(
       includeSmallShops
     });
 
-    let categoryAmenities = localCache.get(categoryCacheKey);
+    let categoryAmenities: any[] = localCache.get(categoryCacheKey) as any[] || [];
 
     if (!categoryAmenities) {
       categoryAmenities = [];
@@ -260,7 +260,7 @@ export async function fetchAmenities(
       }
     }
 
-    allAmenities.push(...(categoryAmenities || []));
+    allAmenities.push(...categoryAmenities);
   }
 
   const sortedAmenities = allAmenities.sort((a, b) => a.distance - b.distance);

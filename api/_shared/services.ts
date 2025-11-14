@@ -160,30 +160,105 @@ export async function analyzeProperty(data: any) {
 }
 
 export async function searchLocations(query: string, limit: number = 10) {
-  // Mock location search - in production this would use a real geocoding service
-  const mockLocations = [
-    { name: `${query}, Hà Nội`, lat: 21.0285, lng: 105.8542, type: 'city' },
-    { name: `${query}, Hồ Chí Minh`, lat: 10.8231, lng: 106.6297, type: 'city' },
-    { name: `${query}, Đà Nẵng`, lat: 16.0544, lng: 108.2022, type: 'city' }
-  ];
+  // Use real Mapbox API instead of mock data - CACHE DISABLED FOR TESTING
+  const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+  if (!token) {
+    console.error('Mapbox token not found');
+    return [];
+  }
 
-  return mockLocations.slice(0, limit);
+  const types = 'address,place,poi,locality,neighborhood,region,postcode,district,country';
+  const base = 'https://api.mapbox.com/search/searchbox/v1/suggest';
+  const url = `${base}?q=${encodeURIComponent(query)}&access_token=${token}&limit=${limit}&country=VN&language=vi&types=${types}`;
+
+  console.log(`Fetching real Mapbox results for: "${query}" with URL: ${url}`);
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`Mapbox API error: ${response.status} ${response.statusText}`);
+      return [];
+    }
+    const data = await response.json();
+
+    if (!data.suggestions || !Array.isArray(data.suggestions)) {
+      console.error('Invalid Mapbox response:', data);
+      return [];
+    }
+
+    console.log(`Mapbox returned ${data.suggestions.length} results for "${query}"`);
+
+    const results = data.suggestions.map((s: any, i: number) => {
+      // Map Mapbox feature types to our interface types
+      let mappedType: string = 'place';
+      const featureType = s.feature_type || '';
+
+      switch (featureType) {
+        case 'address': mappedType = 'address'; break;
+        case 'poi': mappedType = 'poi'; break;
+        case 'locality': mappedType = 'locality'; break;
+        case 'neighborhood': mappedType = 'neighborhood'; break;
+        case 'region': mappedType = 'province'; break;
+        case 'postcode': mappedType = 'postcode'; break;
+        case 'district': mappedType = 'district'; break;
+        case 'country': mappedType = 'country'; break;
+        case 'place':
+        default:
+          mappedType = 'place';
+          break;
+      }
+
+      return {
+        name: s.name || s.feature_name || query,
+        fullName: s.place_formatted || s.name || query,
+        type: mappedType,
+        code: 100000 + i,
+        geocodeQuery: s.place_formatted || s.name || query,
+        mapboxId: s.mapbox_id || s.id,
+        province: s.context?.find((c: any) => c.id.startsWith('region'))?.text,
+        district: s.context?.find((c: any) => c.id.startsWith('district'))?.text
+      };
+    });
+
+    console.log('Processed results:', results.slice(0, 3).map(r => `${r.name} (${r.type})`));
+    return results;
+  } catch (error) {
+    console.error('Error fetching location suggestions:', error);
+    return [];
+  }
 }
 
 export async function suggestLocations(query: string, options: any = {}) {
-  // Mock suggestions
+  // Real suggestions with options support
   return searchLocations(query, options.limit || 10);
 }
 
 export async function retrieveLocation(id: string, sessionToken?: string) {
-  // Mock location retrieval
-  return {
-    id,
-    name: 'Mock Location',
-    lat: 21.0285,
-    lng: 105.8542,
-    type: 'place'
-  };
+  // Use real Mapbox API for location retrieval
+  const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+  if (!token) return null;
+
+  const base = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
+  const url = `${base}/${encodeURIComponent(id)}?access_token=${token}${sessionToken ? `&session_token=${sessionToken}` : ''}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    const feature = data?.features?.[0] || data?.feature;
+    if (!feature?.geometry?.coordinates) return null;
+
+    const [lng, lat] = feature.geometry.coordinates;
+    return {
+      coordinates: [lng, lat],
+      placeName: feature.place_name || feature.name || '',
+      placeType: Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : (feature.feature_type || 'location'),
+      context: feature.text || feature.name || undefined
+    };
+  } catch (error) {
+    console.error('Error retrieving location:', error);
+    return null;
+  }
 }
 
 export async function geocodeLocationCached(query: string) {
