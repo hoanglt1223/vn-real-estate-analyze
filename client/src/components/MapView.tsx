@@ -152,14 +152,57 @@ export default function MapView({
     if (!map.current || !draw.current) return;
 
     const [lng, lat] = result.center;
-    
-    map.current.flyTo({ 
-      center: [lng, lat], 
+
+    map.current.flyTo({
+      center: [lng, lat],
       zoom: 16,
       duration: 1500
     });
 
-    const size = 0.0005;
+    // Tính kích thước polygon phù hợp dựa trên loại địa điểm và giới hạn 1000m²
+    const calculatePolygonSize = (result: any): number => {
+      // Kích thước cơ bản (sẽ điều chỉnh để diện tích <= 1000m²)
+      let baseSize = 0.0002; // Khoảng 400-500m² cho địa điểm trung bình
+
+      // Điều chỉnh dựa trên loại địa điểm
+      if (result.place_type) {
+        const placeType = Array.isArray(result.place_type) ? result.place_type[0] : result.place_type;
+
+        switch (placeType) {
+          case 'address':
+          case 'poi':
+            baseSize = 0.0001; // Địa điểm cụ thể rất nhỏ
+            break;
+          case 'neighborhood':
+            baseSize = 0.0003; // Khu phố nhỏ
+            break;
+          case 'locality':
+          case 'place':
+            baseSize = 0.0004; // Địa điểm lớn hơn
+            break;
+          default:
+            baseSize = 0.0002; // Mặc định
+        }
+      }
+
+      // Điều chỉnh nếu có bounding box
+      if (result.bbox && Array.isArray(result.bbox) && result.bbox.length === 4) {
+        const bboxWidth = Math.abs(result.bbox[2] - result.bbox[0]);
+        const bboxHeight = Math.abs(result.bbox[3] - result.bbox[1]);
+        const avgSize = (bboxWidth + bboxHeight) / 4;
+
+        // Sử dụng kích thước từ bbox nhưng không quá lớn
+        baseSize = Math.min(avgSize, 0.0003);
+      }
+
+      // Giới hạn tối đa để đảm bảo diện tích <= 1000m²
+      // 1 độ dài ≈ 111km, 0.001 độ ≈ 111m, diện tích ≈ 12321m²
+      // Để có diện tích <= 1000m², kích thước tối đa ≈ 0.00028
+      const maxSize = 0.00028;
+      return Math.min(baseSize, maxSize);
+    };
+
+    const size = calculatePolygonSize(result);
     const polygon = [
       [lng - size, lat - size],
       [lng + size, lat - size],
@@ -187,9 +230,9 @@ export default function MapView({
       turf.point(polygon[1])
     );
     const orientation = getOrientation(bearing);
-    
+
     setCurrentCenter({ lat, lng });
-    
+
     onPolygonChange?.({
       coordinates: polygon,
       area: Math.round(area),

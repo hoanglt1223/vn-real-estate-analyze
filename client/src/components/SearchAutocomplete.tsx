@@ -18,6 +18,8 @@ interface GeocodedResult {
   id: string;
   place_name: string;
   center: [number, number];
+  place_type?: string | string[];
+  bbox?: [number, number, number, number];
 }
 
 interface SearchAutocompleteProps {
@@ -106,7 +108,9 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
       const geocodedResult: GeocodedResult = {
         id: `${result.code}-${result.type}`,
         place_name: result.fullName,
-        center: coords
+        center: coords,
+        place_type: result.type,
+        bbox: retrieved.bbox
       };
 
       onSelect(geocodedResult);

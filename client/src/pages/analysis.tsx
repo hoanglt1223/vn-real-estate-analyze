@@ -120,7 +120,7 @@ export default function AnalysisPage() {
   };
 
   const handleAnalyze = async (forceRadius?: number, forceCategories?: string[], forceLayers?: string[], forceIncludeSmallShops?: boolean) => {
-    if (!propertyData.coordinates || propertyData.coordinates.length === 0) {
+    if (!propertyData.coordinates || propertyData.coordinates.length === 0 || propertyData.area <= 0) {
       toast({
         title: 'Lỗi',
         description: 'Vui lòng vẽ khu đất trên bản đồ trước',
