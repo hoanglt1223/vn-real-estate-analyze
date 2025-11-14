@@ -187,12 +187,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!q || q.length < 2) return res.json([]);
         const sessionToken = (req.query.sessionToken as string) || undefined;
         const proximity = (req.query.proximity as string) || undefined;
-        const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood';
+        const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood,region,postcode,district';
         const [mapboxSuggestions, vnAdmin] = await Promise.all([
-          suggestLocations(q, { limit: 10, sessionToken, types, proximity }).catch(() => []),
-          searchLocations(q, 10).catch(() => [])
+          suggestLocations(q, { limit: 20, sessionToken, types, proximity }).catch(() => []),
+          searchLocations(q, 20).catch(() => [])
         ]);
-        const combined = [...mapboxSuggestions, ...vnAdmin].slice(0, 10);
+        const combined = [...mapboxSuggestions, ...vnAdmin].slice(0, 20);
         return res.json(combined);
       }
 
@@ -201,7 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!q || q.length < 2) return res.json([]);
         const limit = parseInt((req.query.limit as string) || '10', 10);
         const sessionToken = (req.query.sessionToken as string) || undefined;
-        const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood';
+        const types = (req.query.types as string) || 'address,place,poi,locality,neighborhood,region,postcode,district';
         const proximity = (req.query.proximity as string) || undefined;
         const suggestions = await suggestLocations(q, { limit, sessionToken, types, proximity });
         return res.json(suggestions);

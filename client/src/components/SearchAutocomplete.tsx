@@ -64,8 +64,8 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
     debounceTimer.current = setTimeout(async () => {
       try {
         const data: VNSearchResult[] = await apiSuggestLocations(query, {
-          limit: 10,
-          types: 'address,place,poi,locality,neighborhood',
+          limit: 20,
+          types: 'address,place,poi,locality,neighborhood,region,postcode,district',
           sessionToken
         });
         
@@ -185,7 +185,7 @@ export default function SearchAutocomplete({ onSelect }: SearchAutocompleteProps
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Tìm kiếm tỉnh/thành phố, quận/huyện..."
+          placeholder="Tìm kiếm địa chỉ, địa điểm, tỉnh/thành phố, quận/huyện..."
           className="w-full pl-10 pr-10 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-sm bg-background"
           data-testid="input-search-address"
           disabled={isGeocoding}
