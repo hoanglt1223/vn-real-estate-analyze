@@ -7,6 +7,8 @@ import { scrapeMarketPrices } from "./services/scraper";
 import { analyzeProperty } from "./services/ai";
 import { searchLocations } from "./services/provinces";
 import { geocodeLocationCached, suggestLocations, retrieveLocation, searchCategory } from "./services/geocoding";
+import { optimizeAnalysisResponse, createCompressedResponse } from "./utils/responseOptimizer";
+import { prefetchForAnalysis } from "./services/prefetch";
 import { z } from "zod";
 import type { InsertPropertyAnalysis, InsertPropertyComparison, InsertPropertyNote, InsertSavedSearch } from "@shared/schema";
 import type { SearchCriteria } from "./storage";
@@ -67,6 +69,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.method === 'POST' && action === 'analyze-property') {
         const input = analyzePropertySchema.parse(req.body);
         const metrics = calculatePropertyMetrics(input.coordinates);
+
+        // Schedule prefetch for nearby areas (don't wait for it)
+        const prefetchEnabled = req.query.prefetch !== 'false'; // Enable by default
+        prefetchForAnalysis(
+          metrics.center.lat,
+          metrics.center.lng,
+          input.radius,
+          input.categories,
+          input.layers,
+          prefetchEnabled
+        );
+
+        // Fetch current data
         const amenities = await fetchAmenities(metrics.center.lat, metrics.center.lng, input.radius, input.categories);
         const infrastructure = await fetchInfrastructure(metrics.center.lat, metrics.center.lng, input.radius, input.layers);
         const riskAssessment = assessRisks(metrics.center, infrastructure);
@@ -93,7 +108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           risks: riskAssessment.risks as any[],
         } as unknown as InsertPropertyAnalysis;
         const analysis = await storage.createPropertyAnalysis(payload);
-        return res.json({
+
+        const responseData = {
           id: analysis.id,
           ...metrics,
           amenities,
@@ -101,8 +117,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           marketData,
           aiAnalysis,
           risks: riskAssessment.risks,
-          overallRiskLevel: riskAssessment.overallRiskLevel
-        });
+          overallRiskLevel: riskAssessment.overallRiskLevel,
+          createdAt: analysis.createdAt
+        };
+
+        // Optimize response unless client explicitly requests full data
+        if (req.query.full === 'true') {
+          return res.json(responseData);
+        } else {
+          const optimizedResponse = createCompressedResponse(responseData, {
+            maxAmenities: 100,
+            maxInfrastructureItems: 50,
+            includeAmenityDetails: true,
+            includeInfrastructureDetails: true,
+            includeMarketDetails: true
+          });
+          return res.json(optimizedResponse);
+        }
       }
 
       if (req.method === 'GET' && action === 'analysis') {

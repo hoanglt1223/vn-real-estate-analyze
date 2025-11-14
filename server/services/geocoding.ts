@@ -1,38 +1,57 @@
+import { cache, generateCacheKey, CACHE_TTL } from '../../shared/services/cache';
+import { fetchWithCache, generateGeocodingKey, generateLocationSuggestionsKey } from '../../shared/services/geocoding';
+import { MapboxClient } from '../../shared/services/httpClient';
+
 export interface GeocodingResult {
   coordinates: [number, number]; // [lng, lat]
   placeName: string;
   placeType: string;
   context?: string;
 }
-const MAPBOX_API_BASE = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
+// Create Mapbox client instance
+let mapboxClient: MapboxClient | null = null;
+
+function getMapboxClient(): MapboxClient {
+  if (!mapboxClient) {
+    const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+    if (!token) {
+      throw new Error('MAPBOX_TOKEN or VITE_MAPBOX_TOKEN is required for geocoding');
+    }
+    mapboxClient = new MapboxClient(token);
+  }
+  return mapboxClient;
+}
 
 export async function geocodeLocation(query: string): Promise<GeocodingResult | null> {
-  const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
-  if (!token) {
-    throw new Error('MAPBOX_TOKEN or VITE_MAPBOX_TOKEN is required for geocoding');
-  }
+  const client = getMapboxClient();
 
-  try {
-    const url = `${MAPBOX_API_BASE}/${encodeURIComponent(query)}.json?access_token=${token}&limit=1&country=VN&language=vi`;
-    const response = await fetch(url);
-    if (!response.ok) {
+  return fetchWithCache('geocoding', { query: query.toLowerCase().trim() }, async () => {
+    try {
+      const response = await client.geocode(query, {
+        country: 'VN',
+        language: 'vi',
+        limit: 1
+      });
+
+      const data = response.data;
+      if (!data.features || data.features.length === 0) {
+        return null;
+      }
+
+      const feature = data.features[0];
+      const [lng, lat] = feature.geometry.coordinates;
+
+      return {
+        coordinates: [lng, lat],
+        placeName: feature.place_name || query,
+        placeType: Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : 'location',
+        context: feature.text || undefined
+      };
+    } catch (error) {
+      console.error('Geocoding error:', error);
       return null;
     }
-    const data = await response.json();
-    if (!data.features || data.features.length === 0) {
-      return null;
-    }
-    const feature = data.features[0];
-    const [lng, lat] = feature.geometry.coordinates;
-    return {
-      coordinates: [lng, lat],
-      placeName: feature.place_name || query,
-      placeType: Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : 'location',
-      context: feature.text || undefined
-    };
-  } catch (error) {
-    throw new Error('Failed to geocode location');
-  }
+  }, CACHE_TTL.GEOCODING);
 }
 
 export interface LocationSuggestion {
@@ -45,6 +64,25 @@ export interface LocationSuggestion {
 }
 
 export async function suggestLocations(query: string, options?: { limit?: number; sessionToken?: string; types?: string; proximity?: string; country?: string; language?: string }): Promise<LocationSuggestion[]> {
+  // Generate cache key for location suggestions (excluding sessionToken)
+  const cacheKey = generateCacheKey('locationSuggestions', {
+    query: query.toLowerCase().trim(),
+    limit: options?.limit ?? 10,
+    types: options?.types ?? 'address,place,poi,locality,neighborhood',
+    proximity: options?.proximity,
+    country: options?.country ?? 'VN',
+    language: options?.language ?? 'vi'
+  });
+
+  // Try to get from cache first (skip caching if sessionToken is provided as it's session-specific)
+  if (!options?.sessionToken) {
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult) {
+      console.log(`Cache hit for location suggestions: ${query}`);
+      return cachedResult;
+    }
+  }
+
   const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
   if (!token) return [];
   const limit = options?.limit ?? 10;
@@ -53,6 +91,8 @@ export async function suggestLocations(query: string, options?: { limit?: number
   const proximity = options?.proximity ? `&proximity=${options?.proximity}` : '';
   const country = options?.country ?? 'VN';
   const language = options?.language ?? 'vi';
+
+  console.log(`Cache miss for location suggestions: ${query}`);
 
   const base = 'https://api.mapbox.com/search/searchbox/v1/suggest';
   const url = `${base}?q=${encodeURIComponent(query)}&access_token=${token}&limit=${limit}&country=${country}&language=${language}&types=${types}${proximity}${sessionToken ? `&session_token=${sessionToken}` : ''}`;
@@ -67,6 +107,12 @@ export async function suggestLocations(query: string, options?: { limit?: number
     geocodeQuery: s.place_formatted || s.name || query,
     mapboxId: s.mapbox_id || s.id
   })) : [];
+
+  // Cache only if no sessionToken is provided
+  if (!options?.sessionToken) {
+    cache.set(cacheKey, suggestions, CACHE_TTL.LOCATION_SUGGESTIONS);
+  }
+
   return suggestions;
 }
 
@@ -120,19 +166,17 @@ export async function searchCategory(poiCategoryCsv: string, params: { lat?: num
   });
 }
 
-// Cache for geocoding results to minimize API calls
-const geocodeCache = new Map<string, { result: GeocodingResult | null; timestamp: number }>();
-const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
-
+// Cached version using unified cache system
 export async function geocodeLocationCached(query: string): Promise<GeocodingResult | null> {
-  const cached = geocodeCache.get(query);
-  
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return cached.result;
+  // Generate cache key for geocoding
+  const cacheKey = generateCacheKey('geocoding', { query: query.toLowerCase().trim() });
+
+  // Try to get from cache first
+  const cachedResult = cache.get(cacheKey);
+  if (cachedResult !== null) {
+    return cachedResult;
   }
-  
-  const result = await geocodeLocation(query);
-  geocodeCache.set(query, { result, timestamp: Date.now() });
-  
-  return result;
+
+  // Cache miss - call the main geocodeLocation function (which also caches)
+  return await geocodeLocation(query);
 }

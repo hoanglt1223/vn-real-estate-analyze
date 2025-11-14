@@ -1,7 +1,11 @@
 import { point } from '@turf/helpers';
 import * as turf from '@turf/turf';
+import { cache, generateCacheKey, CACHE_TTL } from '../../shared/services/cache';
+import { processAmenities, summarizeAmenities, processInfrastructure, summarizeInfrastructure } from '../../shared/services/dataProcessor';
+import { OverpassClient } from '../../shared/services/httpClient';
 
-const OVERPASS_API = 'https://overpass-api.de/api/interpreter';
+// Create HTTP client for Overpass API
+const overpassClient = new OverpassClient();
 
 interface AmenityQuery {
   category: string;
@@ -65,81 +69,122 @@ export async function fetchAmenities(
   categories: string[],
   includeSmallShops: boolean = false
 ): Promise<any[]> {
+  // Generate cache key based on location, radius, categories, and includeSmallShops setting
+  const cacheKey = generateCacheKey('amenities', {
+    lat: lat.toFixed(4),
+    lng: lng.toFixed(4),
+    radius,
+    categories: categories.sort().join(','),
+    includeSmallShops
+  });
+
+  // Try to get from cache first
+  const cachedResult = cache.get(cacheKey);
+  if (cachedResult) {
+    console.log(`Cache hit for amenities: ${cacheKey}`);
+    return cachedResult;
+  }
+
+  console.log(`Cache miss for amenities: ${cacheKey}`);
   const allAmenities: any[] = [];
 
   for (const category of categories) {
     const query = AMENITY_QUERIES[category];
     if (!query) continue;
 
-    try {
-      const overpassQuery = buildOverpassQuery(lat, lng, radius, query.tags);
-      const response = await fetch(OVERPASS_API, {
-        method: 'POST',
-        body: overpassQuery,
-        headers: { 'Content-Type': 'text/plain' }
-      });
+    // Try to get individual category from cache
+    const categoryCacheKey = generateCacheKey('amenities', {
+      lat: lat.toFixed(4),
+      lng: lng.toFixed(4),
+      radius,
+      category,
+      includeSmallShops
+    });
 
-      if (!response.ok) continue;
+    let categoryAmenities = cache.get(categoryCacheKey);
 
-      const data = await response.json();
-      const elements = data.elements || [];
+    if (!categoryAmenities) {
+      // Fetch from Overpass API
+      try {
+        const overpassQuery = buildOverpassQuery(lat, lng, radius, query.tags);
+        const response = await overpassClient.query(overpassQuery);
 
-      for (const element of elements) {
-        const elementLat = element.lat || element.center?.lat;
-        const elementLng = element.lon || element.center?.lon;
+        if (!response.ok) continue;
 
-        if (!elementLat || !elementLng) continue;
+        const data = response.data;
+        const elements = data.elements || [];
 
-        if (!isNotablePlace(element.tags, category, includeSmallShops)) continue;
+        categoryAmenities = [];
 
-        const distanceValue = turf.distance(
-          point([lng, lat]),
-          point([elementLng, elementLat]),
-          { units: 'meters' }
-        );
+        for (const element of elements) {
+          const elementLat = element.lat || element.center?.lat;
+          const elementLng = element.lon || element.center?.lon;
 
-        const name = element.tags?.name || element.tags?.['name:vi'] || getDefaultName(element.tags, category);
+          if (!elementLat || !elementLng) continue;
 
-        const amenityType = element.tags?.aeroway || element.tags?.railway || element.tags?.amenity || element.tags?.shop || element.tags?.leisure || element.tags?.highway;
+          if (!isNotablePlace(element.tags, category, includeSmallShops)) continue;
 
-        const subtype = category === 'education'
-          ? (element.tags?.['school:type'] || element.tags?.['isced:level'] || element.tags?.operator_type)
-          : null;
+          const distanceValue = turf.distance(
+            point([lng, lat]),
+            point([elementLng, elementLat]),
+            { units: 'meters' }
+          );
 
-        // Check if this is a Vietnamese chain
-        const isChain = isVietnameseChain(element.tags);
+          const name = element.tags?.name || element.tags?.['name:vi'] || getDefaultName(element.tags, category);
 
-        allAmenities.push({
-          id: element.id.toString(),
-          name,
-          category,
-          distance: Math.round(distanceValue),
-          walkTime: Math.round(distanceValue / 80),
-          lat: elementLat,
-          lng: elementLng,
-          type: amenityType,
-          subtype: subtype,
-          isChain,
-          tags: {
-            amenity: element.tags?.amenity,
-            shop: element.tags?.shop,
-            brand: element.tags?.brand,
-            operator: element.tags?.operator,
-            name: element.tags?.name,
-            name_vi: element.tags?.['name:vi'],
-            name_en: element.tags?.['name:en'],
-            school_type: element.tags?.['school:type'],
-            isced_level: element.tags?.['isced:level'],
-            operator_type: element.tags?.operator_type
-          }
-        });
+          const amenityType = element.tags?.aeroway || element.tags?.railway || element.tags?.amenity || element.tags?.shop || element.tags?.leisure || element.tags?.highway;
+
+          const subtype = category === 'education'
+            ? (element.tags?.['school:type'] || element.tags?.['isced:level'] || element.tags?.operator_type)
+            : null;
+
+          // Check if this is a Vietnamese chain
+          const isChain = isVietnameseChain(element.tags);
+
+          categoryAmenities.push({
+            id: element.id.toString(),
+            name,
+            category,
+            distance: Math.round(distanceValue),
+            walkTime: Math.round(distanceValue / 80),
+            lat: elementLat,
+            lng: elementLng,
+            type: amenityType,
+            subtype: subtype,
+            isChain,
+            tags: {
+              amenity: element.tags?.amenity,
+              shop: element.tags?.shop,
+              brand: element.tags?.brand,
+              operator: element.tags?.operator,
+              name: element.tags?.name,
+              name_vi: element.tags?.['name:vi'],
+              name_en: element.tags?.['name:en'],
+              school_type: element.tags?.['school:type'],
+              isced_level: element.tags?.['isced:level'],
+              operator_type: element.tags?.operator_type
+            }
+          });
+        }
+
+        // Cache individual category results for longer TTL since amenities change slowly
+        cache.set(categoryCacheKey, categoryAmenities, CACHE_TTL.AMENITIES);
+
+      } catch (error) {
+        console.error(`Error fetching ${category} amenities:`, error);
+        continue;
       }
-    } catch (error) {
-      console.error(`Error fetching ${category} amenities:`, error);
     }
+
+    allAmenities.push(...categoryAmenities);
   }
 
-  return allAmenities.sort((a, b) => a.distance - b.distance);
+  const sortedAmenities = allAmenities.sort((a, b) => a.distance - b.distance);
+
+  // Cache the combined result
+  cache.set(cacheKey, sortedAmenities, CACHE_TTL.AMENITIES);
+
+  return sortedAmenities;
 }
 
 export async function fetchInfrastructure(
@@ -148,54 +193,88 @@ export async function fetchInfrastructure(
   radius: number,
   layers: string[]
 ): Promise<any> {
+  // Generate cache key for infrastructure
+  const cacheKey = generateCacheKey('infrastructure', {
+    lat: lat.toFixed(4),
+    lng: lng.toFixed(4),
+    radius,
+    layers: layers.sort().join(',')
+  });
+
+  // Try to get from cache first
+  const cachedResult = cache.get(cacheKey);
+  if (cachedResult) {
+    console.log(`Cache hit for infrastructure: ${cacheKey}`);
+    return cachedResult;
+  }
+
+  console.log(`Cache miss for infrastructure: ${cacheKey}`);
   const infrastructure: any = {};
 
   for (const layer of layers) {
     const queryConfig = INFRASTRUCTURE_QUERIES[layer as keyof typeof INFRASTRUCTURE_QUERIES];
     if (!queryConfig) continue;
 
-    try {
-      const isLineLayer = queryConfig.type === 'line';
-      const overpassQuery = `
-        [out:json][timeout:25];
-        ${queryConfig.query}
-        (around:${radius},${lat},${lng});
-        ${isLineLayer ? '>;out geom;' : 'out center;'}
-      `;
+    // Try to get individual layer from cache
+    const layerCacheKey = generateCacheKey('infrastructure', {
+      lat: lat.toFixed(4),
+      lng: lng.toFixed(4),
+      radius,
+      layer
+    });
 
-      const response = await fetch(OVERPASS_API, {
-        method: 'POST',
-        body: overpassQuery,
-        headers: { 'Content-Type': 'text/plain' }
-      });
+    let layerData = cache.get(layerCacheKey);
 
-      if (!response.ok) continue;
+    if (!layerData) {
+      try {
+        const isLineLayer = queryConfig.type === 'line';
+        const overpassQuery = `
+          [out:json][timeout:25];
+          ${queryConfig.query}
+          (around:${radius},${lat},${lng});
+          ${isLineLayer ? '>;out geom;' : 'out center;'}
+        `;
 
-      const data = await response.json();
-      
-      if (isLineLayer) {
-        const relations = data.elements.filter((e: any) => e.type === 'relation');
-        infrastructure[layer] = relations.map((relation: any) => ({
-          id: relation.id,
-          name: relation.tags?.name || relation.tags?.['name:vi'] || layer,
-          type: 'line',
-          geometry: extractLineGeometry(data.elements, relation),
-          tags: relation.tags
-        }));
-      } else {
-        infrastructure[layer] = (data.elements || []).map((element: any) => ({
-          id: element.id,
-          name: element.tags?.name || element.tags?.['name:vi'] || layer,
-          type: element.type,
-          lat: element.lat || element.center?.lat,
-          lng: element.lon || element.center?.lon,
-          tags: element.tags
-        }));
+        const response = await overpassClient.query(overpassQuery);
+
+        if (!response.ok) continue;
+
+        const data = response.data;
+
+        if (isLineLayer) {
+          const relations = data.elements.filter((e: any) => e.type === 'relation');
+          layerData = relations.map((relation: any) => ({
+            id: relation.id,
+            name: relation.tags?.name || relation.tags?.['name:vi'] || layer,
+            type: 'line',
+            geometry: extractLineGeometry(data.elements, relation),
+            tags: relation.tags
+          }));
+        } else {
+          layerData = (data.elements || []).map((element: any) => ({
+            id: element.id,
+            name: element.tags?.name || element.tags?.['name:vi'] || layer,
+            type: element.type,
+            lat: element.lat || element.center?.lat,
+            lng: element.lon || element.center?.lon,
+            tags: element.tags
+          }));
+        }
+
+        // Cache individual layer results for longer TTL since infrastructure changes slowly
+        cache.set(layerCacheKey, layerData, CACHE_TTL.INFRASTRUCTURE);
+
+      } catch (error) {
+        console.error(`Error fetching ${layer} infrastructure:`, error);
+        continue;
       }
-    } catch (error) {
-      console.error(`Error fetching ${layer} infrastructure:`, error);
     }
+
+    infrastructure[layer] = layerData;
   }
+
+  // Cache the combined result
+  cache.set(cacheKey, infrastructure, CACHE_TTL.INFRASTRUCTURE);
 
   return infrastructure;
 }

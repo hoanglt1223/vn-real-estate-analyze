@@ -1,3 +1,6 @@
+import { cache, generateCacheKey, CACHE_TTL } from '../../shared/services/cache';
+import { processMarketData } from '../../shared/services/dataProcessor';
+
 export interface PriceListing {
   id: string;
   price: number;
@@ -51,6 +54,26 @@ export async function scrapeMarketPrices(
   lng: number,
   radius: number
 ): Promise<MarketPriceData> {
+  // Generate cache key based on location and radius
+  const cacheKey = generateCacheKey('marketPrices', {
+    lat: lat.toFixed(4),
+    lng: lng.toFixed(4),
+    radius
+  });
+
+  // Try to get from cache first
+  const cachedResult = cache.get(cacheKey);
+  if (cachedResult) {
+    console.log(`Cache hit for market prices: ${cacheKey}`);
+    // Update lastUpdated to current time to keep data fresh
+    return {
+      ...cachedResult,
+      lastUpdated: new Date()
+    };
+  }
+
+  console.log(`Cache miss for market prices: ${cacheKey}`);
+
   // Try to fetch from multiple sources in parallel
   const [batdongsanData, chototData] = await Promise.allSettled([
     fetchFromBatdongsan(lat, lng, radius),
@@ -79,51 +102,58 @@ export async function scrapeMarketPrices(
     });
   }
 
+  let result: MarketPriceData;
+
   // If no real data available, fall back to estimated data (serverless-friendly)
   if (allListings.length === 0) {
     const estimated = generateEstimatedPrices(lat, lng, radius);
     const priceHistory = generatePriceHistory(lat, lng, estimated.avg, Math.round(estimated.avg / 100), estimated.listingCount);
     const priceTrends = analyzePriceTrends(priceHistory, estimated.avg, calculateBasePriceForLocation(lat, lng));
-    return {
+    result = {
       ...estimated,
+      priceHistory,
+      priceTrends
+    };
+  } else {
+    // Calculate statistics from real listings
+    const prices = allListings.map(l => l.price).sort((a, b) => a - b);
+    const pricesPerSqm = allListings.map(l => l.pricePerSqm).filter(p => p > 0);
+
+    const min = prices[0];
+    const max = prices[prices.length - 1];
+    const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+    const median = prices[Math.floor(prices.length / 2)];
+    const avgPerSqm = pricesPerSqm.length > 0
+      ? Math.round(pricesPerSqm.reduce((a, b) => a + b, 0) / pricesPerSqm.length)
+      : Math.round(avg / 100);
+
+    const basePrice = calculateBasePriceForLocation(lat, lng);
+    const trend = determineTrend(avg, basePrice);
+
+    // Generate price history and trend analysis
+    const priceHistory = generatePriceHistory(lat, lng, avg, avgPerSqm, allListings.length);
+    const priceTrends = analyzePriceTrends(priceHistory, avg, basePrice);
+
+    result = {
+      min,
+      avg,
+      max,
+      median,
+      listingCount: allListings.length,
+      trend,
+      pricePerSqm: avgPerSqm,
+      sources,
+      listings: allListings.slice(0, 20), // Return top 20 listings
+      lastUpdated: new Date(),
       priceHistory,
       priceTrends
     };
   }
 
-  // Calculate statistics from real listings
-  const prices = allListings.map(l => l.price).sort((a, b) => a - b);
-  const pricesPerSqm = allListings.map(l => l.pricePerSqm).filter(p => p > 0);
+  // Cache the result with medium TTL since market data changes moderately
+  cache.set(cacheKey, result, CACHE_TTL.MARKET_PRICES);
 
-  const min = prices[0];
-  const max = prices[prices.length - 1];
-  const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
-  const median = prices[Math.floor(prices.length / 2)];
-  const avgPerSqm = pricesPerSqm.length > 0 
-    ? Math.round(pricesPerSqm.reduce((a, b) => a + b, 0) / pricesPerSqm.length)
-    : Math.round(avg / 100);
-
-  const basePrice = calculateBasePriceForLocation(lat, lng);
-  const trend = determineTrend(avg, basePrice);
-
-  // Generate price history and trend analysis
-  const priceHistory = generatePriceHistory(lat, lng, avg, avgPerSqm, allListings.length);
-  const priceTrends = analyzePriceTrends(priceHistory, avg, basePrice);
-
-  return {
-    min,
-    avg,
-    max,
-    median,
-    listingCount: allListings.length,
-    trend,
-    pricePerSqm: avgPerSqm,
-    sources,
-    listings: allListings.slice(0, 20), // Return top 20 listings
-    lastUpdated: new Date(),
-    priceHistory,
-    priceTrends
-  };
+  return result;
 }
 
 async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Promise<{ listings: PriceListing[] }> {
