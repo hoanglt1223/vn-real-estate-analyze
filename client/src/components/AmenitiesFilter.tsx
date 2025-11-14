@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { School, Hospital, ShoppingCart, Dumbbell, Plane } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 
 interface AmenityCategory {
   id: string;
@@ -58,12 +59,45 @@ export default function AmenitiesFilter({
   selectedCategories = [],
   onCategoryChange
 }: AmenitiesFilterProps) {
+  // Debounced radius state for smoother slider interaction
+  const [localRadius, setLocalRadius] = useState(radius);
+  const debounceTimerRef = useRef<NodeJS.Timeout>();
+
+  // Sync with external radius changes
+  useEffect(() => {
+    setLocalRadius(radius);
+  }, [radius]);
+
+  // Debounced radius change handler
+  const handleRadiusSliderChange = (newRadius: number) => {
+    setLocalRadius(newRadius);
+
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new timer to call parent after delay
+    debounceTimerRef.current = setTimeout(() => {
+      onRadiusChange?.(newRadius);
+    }, 400);
+  };
+
   const handleCategoryToggle = (categoryId: string) => {
     const updated = selectedCategories.includes(categoryId)
       ? selectedCategories.filter(id => id !== categoryId)
       : [...selectedCategories, categoryId];
     onCategoryChange?.(updated);
   };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const radiusPresets = [500, 1000, 5000, 10000, 30000];
 
@@ -77,12 +111,12 @@ export default function AmenitiesFilter({
           <div className="flex items-center justify-between">
             <Label className="text-sm font-medium">Bán kính tìm kiếm</Label>
             <span className="text-sm font-semibold" data-testid="text-radius">
-              {radius >= 1000 ? `${radius / 1000} km` : `${radius} m`}
+              {localRadius >= 1000 ? `${localRadius / 1000} km` : `${localRadius} m`}
             </span>
           </div>
           <Slider
-            value={[radius]}
-            onValueChange={(value) => onRadiusChange?.(value[0])}
+            value={[localRadius]}
+            onValueChange={(value) => handleRadiusSliderChange(value[0])}
             min={100}
             max={30000}
             step={100}

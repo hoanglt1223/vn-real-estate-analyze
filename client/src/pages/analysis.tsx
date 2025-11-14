@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'wouter';
 import MapView from '@/components/MapView';
 import PropertyInputPanel from '@/components/PropertyInputPanel';
@@ -31,32 +31,75 @@ export default function AnalysisPage() {
   const [selectedLayers, setSelectedLayers] = useState(['roads', 'metro']);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
-  const [shouldAutoAnalyze, setShouldAutoAnalyze] = useState(false);
+
+  // Performance optimization: Debouncing and cancellation
+  const debounceTimerRef = useRef<NodeJS.Timeout>();
+  const analysisRequestRef = useRef<AbortController>();
+  const [pendingAnalysis, setPendingAnalysis] = useState(false);
+
+  // Debounced filter change handlers
+  const debouncedAnalyze = useCallback(
+    (analysisRadius: number, analysisCategories: string[], analysisLayers: string[]) => {
+      // Clear any existing timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      // Cancel any ongoing request
+      if (analysisRequestRef.current) {
+        analysisRequestRef.current.abort();
+      }
+
+      // Set pending state for UI feedback
+      setPendingAnalysis(true);
+
+      // Set new timer for debounced analysis
+      debounceTimerRef.current = setTimeout(async () => {
+        await handleAnalyze(analysisRadius, analysisCategories, analysisLayers);
+        setPendingAnalysis(false);
+      }, 1200); // Increased debounce time for better performance
+
+      return () => {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+      };
+    },
+    []
+  );
 
   const handleRadiusChange = (newRadius: number) => {
     setRadius(newRadius);
-    setShouldAutoAnalyze(true);
+    if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
+      debouncedAnalyze(newRadius, selectedCategories, selectedLayers);
+    }
   };
 
   const handleCategoryChange = (categories: string[]) => {
     setSelectedCategories(categories);
-    setShouldAutoAnalyze(true);
+    if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
+      debouncedAnalyze(radius, categories, selectedLayers);
+    }
   };
 
   const handleLayerChange = (layers: string[]) => {
     setSelectedLayers(layers);
-    setShouldAutoAnalyze(true);
+    if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
+      debouncedAnalyze(radius, selectedCategories, layers);
+    }
   };
 
+  // Cleanup on unmount
   useEffect(() => {
-    if (shouldAutoAnalyze && propertyData.area > 0 && propertyData.coordinates.length > 0) {
-      const timer = setTimeout(async () => {
-        await handleAnalyze(radius, selectedCategories, selectedLayers);
-        setShouldAutoAnalyze(false);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [radius, selectedCategories, selectedLayers, shouldAutoAnalyze, propertyData]);
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      if (analysisRequestRef.current) {
+        analysisRequestRef.current.abort();
+      }
+    };
+  }, []);
 
   const handlePolygonChange = (data: any) => {
     setPropertyData({
@@ -82,30 +125,50 @@ export default function AnalysisPage() {
     const analysisCategories = forceCategories ?? selectedCategories;
     const analysisLayers = forceLayers ?? selectedLayers;
 
+    // Cancel any ongoing request
+    if (analysisRequestRef.current) {
+      analysisRequestRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    analysisRequestRef.current = abortController;
+
     setIsAnalyzing(true);
-    
+
     try {
       const results = await analyzeProperty({
         coordinates: propertyData.coordinates,
         radius: analysisRadius,
         categories: analysisCategories,
-        layers: analysisLayers
+        layers: analysisLayers,
+        signal: abortController.signal
       });
 
-      setAnalysisResults(results);
-      
-      toast({
-        title: 'Thành công',
-        description: 'Đã phân tích xong khu đất'
-      });
+      // Only update results if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setAnalysisResults(results);
+
+        toast({
+          title: 'Thành công',
+          description: 'Đã phân tích xong khu đất'
+        });
+      }
     } catch (error: any) {
-      toast({
-        title: 'Lỗi phân tích',
-        description: error.message || 'Không thể phân tích khu đất',
-        variant: 'destructive'
-      });
+      // Don't show error toast for aborted requests
+      if (!abortController.signal.aborted) {
+        toast({
+          title: 'Lỗi phân tích',
+          description: error.message || 'Không thể phân tích khu đất',
+          variant: 'destructive'
+        });
+      }
     } finally {
-      setIsAnalyzing(false);
+      // Only update loading state if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setIsAnalyzing(false);
+        setPendingAnalysis(false);
+      }
     }
   };
 
@@ -202,12 +265,17 @@ export default function AnalysisPage() {
                 <Button
                   onClick={() => handleAnalyze()}
                   disabled={isAnalyzing}
-                  className="w-full"
+                  className={`w-full ${pendingAnalysis && !isAnalyzing ? 'animate-pulse' : ''}`}
                   size="lg"
                   data-testid="button-analyze"
                 >
                   {isAnalyzing ? (
                     <>Đang phân tích...</>
+                  ) : pendingAnalysis ? (
+                    <>
+                      <Play className="w-4 h-4 mr-2 opacity-50" />
+                      Đang chờ phân tích...
+                    </>
                   ) : (
                     <>
                       <Play className="w-4 h-4 mr-2" />
