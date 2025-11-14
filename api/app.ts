@@ -3,13 +3,20 @@ import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import { calculatePropertyMetrics, assessRisks } from '../server/services/geospatial.js';
+import {
+  calculatePropertyMetrics,
+  assessRisks,
+  scrapeMarketPrices,
+  analyzeProperty,
+  searchLocations,
+  suggestLocations,
+  retrieveLocation,
+  geocodeLocationCached,
+  searchCategory,
+  type PropertyAnalysis,
+  type InsertPropertyAnalysis
+} from './_shared/services.js';
 import { fetchAmenities, fetchInfrastructure } from './_shared/overpass.js';
-import { scrapeMarketPrices } from '../server/services/scraper.js';
-import { analyzeProperty } from '../server/services/ai.js';
-import { searchLocations } from '../server/services/provinces.js';
-import { geocodeLocationCached, suggestLocations, retrieveLocation, searchCategory } from '../server/services/geocoding.js';
-import type { PropertyAnalysis, InsertPropertyAnalysis } from '../shared/schema.js';
 
 const store = new Map<string, PropertyAnalysis>();
 
