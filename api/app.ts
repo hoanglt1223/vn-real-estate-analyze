@@ -4,7 +4,7 @@ import { handleError } from './_shared/error-handler.js';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { calculatePropertyMetrics, assessRisks } from '../server/services/geospatial.js';
-import { fetchAmenities, fetchInfrastructure } from '../server/services/overpass.js';
+import { fetchAmenities, fetchInfrastructure } from './_shared/overpass.js';
 import { scrapeMarketPrices } from '../server/services/scraper.js';
 import { analyzeProperty } from '../server/services/ai.js';
 import { searchLocations } from '../server/services/provinces.js';
