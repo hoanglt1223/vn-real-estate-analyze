@@ -29,6 +29,7 @@ export default function AnalysisPage() {
   const [radius, setRadius] = useState(1000);
   const [selectedCategories, setSelectedCategories] = useState(['education', 'healthcare']);
   const [selectedLayers, setSelectedLayers] = useState(['roads', 'metro']);
+  const [includeSmallShops, setIncludeSmallShops] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
 
@@ -39,7 +40,7 @@ export default function AnalysisPage() {
 
   // Debounced filter change handlers
   const debouncedAnalyze = useCallback(
-    (analysisRadius: number, analysisCategories: string[], analysisLayers: string[]) => {
+    (analysisRadius: number, analysisCategories: string[], analysisLayers: string[], analysisIncludeSmallShops: boolean = false) => {
       // Clear any existing timer
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -55,7 +56,7 @@ export default function AnalysisPage() {
 
       // Set new timer for debounced analysis
       debounceTimerRef.current = setTimeout(async () => {
-        await handleAnalyze(analysisRadius, analysisCategories, analysisLayers);
+        await handleAnalyze(analysisRadius, analysisCategories, analysisLayers, analysisIncludeSmallShops);
         setPendingAnalysis(false);
       }, 1200); // Increased debounce time for better performance
 
@@ -71,21 +72,28 @@ export default function AnalysisPage() {
   const handleRadiusChange = (newRadius: number) => {
     setRadius(newRadius);
     if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
-      debouncedAnalyze(newRadius, selectedCategories, selectedLayers);
+      debouncedAnalyze(newRadius, selectedCategories, selectedLayers, includeSmallShops);
     }
   };
 
   const handleCategoryChange = (categories: string[]) => {
     setSelectedCategories(categories);
     if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
-      debouncedAnalyze(radius, categories, selectedLayers);
+      debouncedAnalyze(radius, categories, selectedLayers, includeSmallShops);
     }
   };
 
   const handleLayerChange = (layers: string[]) => {
     setSelectedLayers(layers);
     if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
-      debouncedAnalyze(radius, selectedCategories, layers);
+      debouncedAnalyze(radius, selectedCategories, layers, includeSmallShops);
+    }
+  };
+
+  const handleIncludeSmallShopsChange = (includeSmall: boolean) => {
+    setIncludeSmallShops(includeSmall);
+    if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
+      debouncedAnalyze(radius, selectedCategories, selectedLayers, includeSmall);
     }
   };
 
@@ -111,7 +119,7 @@ export default function AnalysisPage() {
     });
   };
 
-  const handleAnalyze = async (forceRadius?: number, forceCategories?: string[], forceLayers?: string[]) => {
+  const handleAnalyze = async (forceRadius?: number, forceCategories?: string[], forceLayers?: string[], forceIncludeSmallShops?: boolean) => {
     if (!propertyData.coordinates || propertyData.coordinates.length === 0) {
       toast({
         title: 'Lỗi',
@@ -124,6 +132,7 @@ export default function AnalysisPage() {
     const analysisRadius = forceRadius ?? radius;
     const analysisCategories = forceCategories ?? selectedCategories;
     const analysisLayers = forceLayers ?? selectedLayers;
+    const analysisIncludeSmallShops = forceIncludeSmallShops ?? includeSmallShops;
 
     // Cancel any ongoing request
     if (analysisRequestRef.current) {
@@ -142,6 +151,7 @@ export default function AnalysisPage() {
         radius: analysisRadius,
         categories: analysisCategories,
         layers: analysisLayers,
+        includeSmallShops: analysisIncludeSmallShops,
         signal: abortController.signal
       });
 
@@ -250,6 +260,8 @@ export default function AnalysisPage() {
                 onRadiusChange={handleRadiusChange}
                 selectedCategories={selectedCategories}
                 onCategoryChange={handleCategoryChange}
+                includeSmallShops={includeSmallShops}
+                onIncludeSmallShopsChange={handleIncludeSmallShopsChange}
               />
 
               <InfrastructureLayer

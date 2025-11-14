@@ -3,7 +3,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { School, Hospital, ShoppingCart, Dumbbell, Plane } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { School, Hospital, ShoppingCart, Dumbbell, Plane, Store } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 interface AmenityCategory {
@@ -18,6 +19,8 @@ interface AmenitiesFilterProps {
   onRadiusChange?: (radius: number) => void;
   selectedCategories?: string[];
   onCategoryChange?: (categories: string[]) => void;
+  includeSmallShops?: boolean;
+  onIncludeSmallShopsChange?: (includeSmallShops: boolean) => void;
 }
 
 const categories: AmenityCategory[] = [
@@ -57,7 +60,9 @@ export default function AmenitiesFilter({
   radius = 1000,
   onRadiusChange,
   selectedCategories = [],
-  onCategoryChange
+  onCategoryChange,
+  includeSmallShops = false,
+  onIncludeSmallShopsChange
 }: AmenitiesFilterProps) {
   // Debounced radius state for smoother slider interaction
   const [localRadius, setLocalRadius] = useState(radius);
@@ -135,6 +140,26 @@ export default function AmenitiesFilter({
               </Badge>
             ))}
           </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Store className="w-4 h-4" />
+              <Label htmlFor="include-small-shops" className="text-sm font-medium cursor-pointer">
+                Hiển thị quán nhỏ lẻ
+              </Label>
+            </div>
+            <Switch
+              id="include-small-shops"
+              checked={includeSmallShops}
+              onCheckedChange={onIncludeSmallShopsChange}
+              data-testid="switch-include-small-shops"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Bao gồm các cửa hàng nhỏ, quán ăn địa phương không phải chuỗi lớn
+          </p>
         </div>
 
         <div className="space-y-4">
