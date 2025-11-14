@@ -5,11 +5,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && node -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('dist/shared')) { fs.mkdirSync('dist/shared', { recursive: true }); } function copyRecursive(src, dest) { if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true }); const entries = fs.readdirSync(src, { withFileTypes: true }); for (let entry of entries) { const srcPath = path.join(src, entry.name); const destPath = path.join(dest, entry.name); if (entry.isDirectory()) { copyRecursive(srcPath, destPath); } else { fs.copyFileSync(srcPath, destPath); } } } copyRecursive('shared', 'dist/shared');\"",
     "start": "NODE_ENV=production node dist/index.js",
     "dev:vite": "vite dev",
     "build:vite": "vite build",
-    "build:vercel": "vite build",
+    "build:vercel": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && node -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('dist/shared')) { fs.mkdirSync('dist/shared', { recursive: true }); } function copyRecursive(src, dest) { if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true }); const entries = fs.readdirSync(src, { withFileTypes: true }); for (let entry of entries) { const srcPath = path.join(src, entry.name); const destPath = path.join(dest, entry.name); if (entry.isDirectory()) { copyRecursive(srcPath, destPath); } else { fs.copyFileSync(srcPath, destPath); } } } copyRecursive('shared', 'dist/shared');\"",
     "start:vite": "vite preview",
     "check": "node node_modules/typescript/bin/tsc",
     "format:check": "prettier --check .",

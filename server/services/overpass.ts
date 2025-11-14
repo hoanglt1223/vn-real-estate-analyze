@@ -1,11 +1,99 @@
 import { point } from '@turf/helpers';
 import * as turf from '@turf/turf';
-import { cache, generateCacheKey, CACHE_TTL } from '../../shared/services/cache';
-import { processAmenities, summarizeAmenities, processInfrastructure, summarizeInfrastructure } from '../../shared/services/dataProcessor';
 import { OverpassClient } from '../../shared/services/httpClient';
 
 // Create HTTP client for Overpass API
 const overpassClient = new OverpassClient();
+
+// Local cache implementation to avoid shared dependency issues
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+}
+
+class LocalMemoryCache {
+  private cache: Map<string, CacheEntry<any>> = new Map();
+
+  set<T>(key: string, data: T, ttl?: number): void {
+    const entry: CacheEntry<T> = {
+      data,
+      timestamp: Date.now(),
+      ttl: ttl || 300000 // 5 minutes default
+    };
+    this.cache.set(key, entry);
+  }
+
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    // Check if entry has expired
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return entry.data;
+  }
+
+  has(key: string): boolean {
+    const entry = this.cache.get(key);
+    if (!entry) return false;
+
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.cache.delete(key);
+      return false;
+    }
+
+    return true;
+  }
+
+  delete(key: string): boolean {
+    return this.cache.delete(key);
+  }
+
+  cleanup(): void {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp > entry.ttl) {
+        keysToDelete.push(key);
+      }
+    }
+    for (const key of keysToDelete) {
+      this.cache.delete(key);
+    }
+  }
+}
+
+// Local cache instance
+const localCache = new LocalMemoryCache();
+
+// Cache TTL constants
+const CACHE_TTL = {
+  AMENITIES: 10 * 60 * 1000, // 10 minutes
+  INFRASTRUCTURE: 30 * 60 * 1000, // 30 minutes
+};
+
+// Generate cache key function
+function generateCacheKey(
+  type: 'amenities' | 'infrastructure',
+  params: Record<string, any>
+): string {
+  const sortedParams = Object.keys(params)
+    .sort()
+    .map(key => `${key}:${params[key]}`)
+    .join('|');
+  return `${type}:${sortedParams}`;
+}
+
+// Cleanup expired entries every 10 minutes
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    localCache.cleanup();
+  }, 10 * 60 * 1000);
+}
 
 interface AmenityQuery {
   category: string;
@@ -79,7 +167,7 @@ export async function fetchAmenities(
   });
 
   // Try to get from cache first
-  const cachedResult = cache.get(cacheKey);
+  const cachedResult = localCache.get(cacheKey);
   if (cachedResult) {
     console.log(`Cache hit for amenities: ${cacheKey}`);
     return cachedResult;
@@ -101,15 +189,16 @@ export async function fetchAmenities(
       includeSmallShops
     });
 
-    let categoryAmenities = cache.get(categoryCacheKey);
+    let categoryAmenities = localCache.get(categoryCacheKey);
 
     if (!categoryAmenities) {
+      categoryAmenities = [];
       // Fetch from Overpass API
       try {
         const overpassQuery = buildOverpassQuery(lat, lng, radius, query.tags);
         const response = await overpassClient.query(overpassQuery);
 
-        if (!response.ok) continue;
+        if (!response.data) continue;
 
         const data = response.data;
         const elements = data.elements || [];
@@ -168,7 +257,7 @@ export async function fetchAmenities(
         }
 
         // Cache individual category results for longer TTL since amenities change slowly
-        cache.set(categoryCacheKey, categoryAmenities, CACHE_TTL.AMENITIES);
+        localCache.set(categoryCacheKey, categoryAmenities, CACHE_TTL.AMENITIES);
 
       } catch (error) {
         console.error(`Error fetching ${category} amenities:`, error);
@@ -182,7 +271,7 @@ export async function fetchAmenities(
   const sortedAmenities = allAmenities.sort((a, b) => a.distance - b.distance);
 
   // Cache the combined result
-  cache.set(cacheKey, sortedAmenities, CACHE_TTL.AMENITIES);
+  localCache.set(cacheKey, sortedAmenities, CACHE_TTL.AMENITIES);
 
   return sortedAmenities;
 }
@@ -202,7 +291,7 @@ export async function fetchInfrastructure(
   });
 
   // Try to get from cache first
-  const cachedResult = cache.get(cacheKey);
+  const cachedResult = localCache.get(cacheKey);
   if (cachedResult) {
     console.log(`Cache hit for infrastructure: ${cacheKey}`);
     return cachedResult;
@@ -223,7 +312,7 @@ export async function fetchInfrastructure(
       layer
     });
 
-    let layerData = cache.get(layerCacheKey);
+    let layerData = localCache.get(layerCacheKey);
 
     if (!layerData) {
       try {
@@ -237,7 +326,7 @@ export async function fetchInfrastructure(
 
         const response = await overpassClient.query(overpassQuery);
 
-        if (!response.ok) continue;
+        if (!response.data) continue;
 
         const data = response.data;
 
@@ -262,7 +351,7 @@ export async function fetchInfrastructure(
         }
 
         // Cache individual layer results for longer TTL since infrastructure changes slowly
-        cache.set(layerCacheKey, layerData, CACHE_TTL.INFRASTRUCTURE);
+        localCache.set(layerCacheKey, layerData, CACHE_TTL.INFRASTRUCTURE);
 
       } catch (error) {
         console.error(`Error fetching ${layer} infrastructure:`, error);
@@ -274,7 +363,7 @@ export async function fetchInfrastructure(
   }
 
   // Cache the combined result
-  cache.set(cacheKey, infrastructure, CACHE_TTL.INFRASTRUCTURE);
+  localCache.set(cacheKey, infrastructure, CACHE_TTL.INFRASTRUCTURE);
 
   return infrastructure;
 }
