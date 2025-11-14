@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
-import * as turf from '@turf/turf';
+import { polygon, area, bearing, point, centroid, circle } from '@turf/turf';
 import SearchAutocomplete from './SearchAutocomplete';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -203,7 +203,7 @@ export default function MapView({
     };
 
     const size = calculatePolygonSize(result);
-    const polygon = [
+    const polygonCoords = [
       [lng - size, lat - size],
       [lng + size, lat - size],
       [lng + size, lat + size],
@@ -216,26 +216,26 @@ export default function MapView({
       type: 'Feature',
       geometry: {
         type: 'Polygon',
-        coordinates: [polygon]
+        coordinates: [polygonCoords]
       },
       properties: {},
       id: undefined
     };
     draw.current.add(feature as any);
 
-    const turfPolygon = turf.polygon([polygon]);
-    const area = turf.area(turfPolygon);
-    const bearing = turf.bearing(
-      turf.point(polygon[0]),
-      turf.point(polygon[1])
+    const turfPolygon = polygon([polygonCoords]);
+    const areaValue = area(turfPolygon);
+    const bearingValue = bearing(
+      point(polygonCoords[0]),
+      point(polygonCoords[1])
     );
-    const orientation = getOrientation(bearing);
+    const orientation = getOrientation(bearingValue);
 
     setCurrentCenter({ lat, lng });
 
     onPolygonChange?.({
-      coordinates: polygon,
-      area: Math.round(area),
+      coordinates: polygonCoords,
+      area: Math.round(areaValue),
       orientation,
       frontageCount: 4,
       center: { lat, lng }
@@ -392,24 +392,24 @@ export default function MapView({
       if (!draw.current) return;
       const data = draw.current.getAll();
       if (data.features.length > 0) {
-        const polygon = data.features[0];
-        if (polygon.geometry.type === 'Polygon') {
-          const coords = polygon.geometry.coordinates[0];
-          const turfPolygon = turf.polygon([coords]);
-          const area = turf.area(turfPolygon);
-          const bearing = turf.bearing(
-            turf.point(coords[0]),
-            turf.point(coords[1])
+        const polygonFeature = data.features[0];
+        if (polygonFeature.geometry.type === 'Polygon') {
+          const coords = polygonFeature.geometry.coordinates[0];
+          const turfPolygon = polygon([coords]);
+          const areaValue = area(turfPolygon);
+          const bearingValue = bearing(
+            point(coords[0]),
+            point(coords[1])
           );
-          const orientation = getOrientation(bearing);
-          const centerPoint = turf.centroid(turfPolygon);
+          const orientation = getOrientation(bearingValue);
+          const centerPoint = centroid(turfPolygon);
           const [lng, lat] = centerPoint.geometry.coordinates;
-          
+
           setCurrentCenter({ lat, lng });
-          
+
           onPolygonChange?.({
             coordinates: coords,
-            area: Math.round(area),
+            area: Math.round(areaValue),
             orientation,
             frontageCount: coords.length - 1,
             center: { lat, lng }
@@ -429,12 +429,12 @@ export default function MapView({
 
     const source = map.current.getSource(radiusSourceRef.current) as mapboxgl.GeoJSONSource;
     if (source) {
-      const circle = turf.circle([currentCenter.lng, currentCenter.lat], radius / 1000, {
+      const circleGeometry = circle([currentCenter.lng, currentCenter.lat], radius / 1000, {
         steps: 64,
         units: 'kilometers'
       });
 
-      source.setData(circle);
+      source.setData(circleGeometry);
     }
   }, [radius, currentCenter, isLoaded]);
 

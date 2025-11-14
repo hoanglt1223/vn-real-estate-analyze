@@ -1,4 +1,4 @@
-import { polygon, point, area, centroid, bearing, distance } from '@turf/turf';
+import { polygon, point, centroid, area, bearing, distance } from '@turf/turf';
 
 export interface PropertyMetrics {
   area: number;
