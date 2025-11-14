@@ -85,9 +85,13 @@ export class MemStorage implements IStorage {
   async createPropertyAnalysis(analysis: InsertPropertyAnalysis): Promise<PropertyAnalysis> {
     const id = randomUUID();
     const propertyAnalysis: PropertyAnalysis = {
-      ...analysis,
       id,
       createdAt: new Date(),
+      coordinates: analysis.coordinates as number[][],
+      area: analysis.area,
+      orientation: analysis.orientation,
+      frontageCount: analysis.frontageCount,
+      center: analysis.center as { lat: number; lng: number },
       amenities: analysis.amenities ?? null,
       infrastructure: analysis.infrastructure ?? null,
       risks: analysis.risks ?? null,
@@ -120,12 +124,24 @@ export class MemStorage implements IStorage {
   async updatePropertyAnalysis(id: string, data: Partial<InsertPropertyAnalysis>): Promise<PropertyAnalysis | undefined> {
     const existing = this.propertyAnalyses.get(id);
     if (!existing) return undefined;
-    
+
     const updated: PropertyAnalysis = {
-      ...existing,
-      ...data,
-      id,
-      createdAt: existing.createdAt
+      id: existing.id,
+      createdAt: existing.createdAt,
+      coordinates: data.coordinates ? data.coordinates as number[][] : existing.coordinates,
+      area: data.area ?? existing.area,
+      orientation: data.orientation ?? existing.orientation,
+      frontageCount: data.frontageCount ?? existing.frontageCount,
+      center: data.center ? data.center as { lat: number; lng: number } : existing.center,
+      amenities: data.amenities ?? existing.amenities,
+      infrastructure: data.infrastructure ?? existing.infrastructure,
+      risks: data.risks ?? existing.risks,
+      propertyType: data.propertyType ?? existing.propertyType,
+      marketData: data.marketData ?? existing.marketData,
+      aiAnalysis: data.aiAnalysis ?? existing.aiAnalysis,
+      valuation: data.valuation ?? existing.valuation,
+      askingPrice: data.askingPrice ?? existing.askingPrice,
+      notes: data.notes ?? existing.notes,
     };
     this.propertyAnalyses.set(id, updated);
     return updated;
@@ -179,9 +195,11 @@ export class MemStorage implements IStorage {
   async createPropertyComparison(comparison: InsertPropertyComparison): Promise<PropertyComparison> {
     const id = randomUUID();
     const propertyComparison: PropertyComparison = {
-      ...comparison,
       id,
       createdAt: new Date(),
+      userId: comparison.userId,
+      propertyIds: comparison.propertyIds as string[],
+      comparisonResult: comparison.comparisonResult,
     };
     this.propertyComparisons.set(id, propertyComparison);
     return propertyComparison;
@@ -331,7 +349,22 @@ export class DbStorage implements IStorage {
   }
 
   async createPropertyAnalysis(analysis: InsertPropertyAnalysis): Promise<PropertyAnalysis> {
-    const [result] = await db.insert(propertyAnalyses).values(analysis).returning();
+    const [result] = await db.insert(propertyAnalyses).values({
+      coordinates: analysis.coordinates as number[][],
+      area: analysis.area,
+      orientation: analysis.orientation,
+      frontageCount: analysis.frontageCount,
+      center: analysis.center as { lat: number; lng: number },
+      amenities: analysis.amenities,
+      infrastructure: analysis.infrastructure,
+      marketData: analysis.marketData,
+      aiAnalysis: analysis.aiAnalysis,
+      risks: analysis.risks,
+      propertyType: analysis.propertyType,
+      valuation: analysis.valuation,
+      askingPrice: analysis.askingPrice,
+      notes: analysis.notes,
+    }).returning();
     return result;
   }
 
@@ -388,7 +421,11 @@ export class DbStorage implements IStorage {
 
   // Property comparisons
   async createPropertyComparison(comparison: InsertPropertyComparison): Promise<PropertyComparison> {
-    const [result] = await db.insert(propertyComparisons).values(comparison).returning();
+    const [result] = await db.insert(propertyComparisons).values({
+      userId: comparison.userId,
+      propertyIds: comparison.propertyIds as string[],
+      comparisonResult: comparison.comparisonResult,
+    }).returning();
     return result;
   }
 
