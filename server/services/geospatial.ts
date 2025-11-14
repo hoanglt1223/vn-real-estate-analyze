@@ -1,4 +1,4 @@
-import * as turf from '@turf/turf';
+import { polygon, point, area, centroid, bearing, distance } from '@turf/turf';
 
 export interface PropertyMetrics {
   area: number;
@@ -8,18 +8,18 @@ export interface PropertyMetrics {
 }
 
 export function calculatePropertyMetrics(coordinates: number[][]): PropertyMetrics {
-  const poly = turf.polygon([coordinates]);
-  const areaValue = turf.area(poly);
+  const poly = polygon([coordinates]);
+  const areaValue = area(poly);
 
-  const centerFeature = turf.centroid(poly);
+  const centerFeature = centroid(poly);
   const center = {
     lat: centerFeature.geometry.coordinates[1],
     lng: centerFeature.geometry.coordinates[0]
   };
 
-  const brg = turf.bearing(
-    turf.point(coordinates[0]),
-    turf.point(coordinates[1])
+  const brg = bearing(
+    point(coordinates[0]),
+    point(coordinates[1])
   );
   const orientation = getOrientation(brg);
 
@@ -65,14 +65,14 @@ export function assessRisks(
   const risks: any[] = [];
   let totalRiskPoints = 0;
 
-  const centerPoint = turf.point([center.lng, center.lat]);
+  const centerPoint = point([center.lng, center.lat]);
 
   if (infrastructure.industrial && infrastructure.industrial.length > 0) {
     const closest = infrastructure.industrial[0];
     if (closest.lat && closest.lng) {
-      const distanceValue = turf.distance(
+      const distanceValue = distance(
         centerPoint,
-        turf.point([closest.lng, closest.lat]),
+        point([closest.lng, closest.lat]),
         { units: 'meters' }
       );
 
@@ -103,9 +103,9 @@ export function assessRisks(
   if (infrastructure.power && infrastructure.power.length > 0) {
     const closest = infrastructure.power[0];
     if (closest.lat && closest.lng) {
-      const distanceValue = turf.distance(
+      const distanceValue = distance(
         centerPoint,
-        turf.point([closest.lng, closest.lat]),
+        point([closest.lng, closest.lat]),
         { units: 'meters' }
       );
 
@@ -136,9 +136,9 @@ export function assessRisks(
   if (infrastructure.cemetery && infrastructure.cemetery.length > 0) {
     const closest = infrastructure.cemetery[0];
     if (closest.lat && closest.lng) {
-      const distanceValue = turf.distance(
+      const distanceValue = distance(
         centerPoint,
-        turf.point([closest.lng, closest.lat]),
+        point([closest.lng, closest.lat]),
         { units: 'meters' }
       );
 
