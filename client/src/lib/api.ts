@@ -52,13 +52,20 @@ export async function analyzeProperty(data: {
   radius: number;
   categories: string[];
   layers: string[];
+  signal?: AbortSignal;
 }) {
   const response = await fetch(API_ENDPOINTS.analyzeProperty, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      coordinates: data.coordinates,
+      radius: data.radius,
+      categories: data.categories,
+      layers: data.layers
+    }),
+    signal: data.signal,
   });
 
   if (!response.ok) {

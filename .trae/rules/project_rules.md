@@ -35,12 +35,12 @@
 ## Scripts & Tooling (Vite 7)
 
 - Frontend development runs with Vite 7
-  - Add `dev:client: vite dev`
+  - Add `dev:vite: vite dev`
 - Build artifacts
-  - Add `build:client: vite build`
+  - Add `build:vite: vite build`
   - Add `build:vercel: vite build` (used by `vercel.json:21`)
 - Preview static
-  - Add `start:client: vite preview --outDir dist/public`
+  - Add `start:vite: vite preview --outDir dist/public`
 - Express-specific build remains only for local legacy mode
   - Current `package.json:6-12` bundles `server/index.ts` via esbuild; deprecate for serverless deploys
 
