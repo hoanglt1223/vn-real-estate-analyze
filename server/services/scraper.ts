@@ -544,63 +544,77 @@ function parseApifyResults(items: any[], lat: number, lng: number, radius: numbe
 }
 
 function generateMockListings(source: string, lat: number, lng: number, radius: number, count: number): { listings: PriceListing[] } {
-  const basePrice = calculateBasePriceForLocation(lat, lng);
-  const radiusKm = radius / 1000;
+  const basePricePerSqm = calculateBasePriceForLocation(lat, lng);
   const priceVariation = 0.3;
-  
+
   const listings: PriceListing[] = [];
-  const areas = [50, 60, 75, 80, 90, 100, 120, 150, 200, 250, 300];
+  // More realistic land areas including larger plots
+  const areas = [80, 100, 120, 150, 200, 250, 300, 500, 800, 1000, 1500, 2000];
   const streets = ['Nguyễn Huệ', 'Lê Lợi', 'Trần Hưng Đạo', 'Hai Bà Trưng', 'Pasteur', 'Cách Mạng Tháng 8'];
-  
+
   for (let i = 0; i < count; i++) {
     const variation = (Math.random() - 0.5) * 2 * priceVariation;
     const area = areas[Math.floor(Math.random() * areas.length)];
-    const pricePerSqm = basePrice / 100 * (1 + variation);
-    const totalPrice = Math.round((pricePerSqm * area) / 1000000) * 1000000;
-    
+    const pricePerSqmForListing = basePricePerSqm * (1 + variation);
+    const totalPrice = Math.round(pricePerSqmForListing * area);
+
     const street = streets[Math.floor(Math.random() * streets.length)];
     const district = Math.floor(Math.random() * 12) + 1;
-    
+
     listings.push({
       id: `${source}-${Date.now()}-${i}`,
       price: totalPrice,
-      pricePerSqm: Math.round(pricePerSqm),
+      pricePerSqm: Math.round(pricePerSqmForListing),
       area,
       address: `${street}, Quận ${district}, TP.HCM`,
       source: source === 'batdongsan' ? 'Batdongsan.com.vn' : 'Chotot.com',
-      url: source === 'batdongsan' 
+      url: source === 'batdongsan'
         ? `https://batdongsan.com.vn/nha-dat-ban/tp-hcm/listing-${i}`
         : `https://nha.chotot.com/tp-ho-chi-minh/mua-ban-nha-dat/listing-${i}`,
       postedDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000) // Random within last 30 days
     });
   }
-  
+
   return { listings };
 }
 
 function generateEstimatedPrices(lat: number, lng: number, radius: number): MarketPriceData {
   const prices: number[] = [];
+  const pricesPerSqm: number[] = [];
   const radiusKm = radius / 1000;
   const priceVariation = 0.2 + (radiusKm * 0.05);
-  const basePrice = calculateBasePriceForLocation(lat, lng);
+  const basePricePerSqm = calculateBasePriceForLocation(lat, lng);
   const listingCount = Math.floor(20 + Math.random() * 40);
-  
+
+  // Generate listings with varying land sizes and calculate total prices
   for (let i = 0; i < listingCount; i++) {
+    // Generate realistic land sizes (50m² to 500m² for smaller plots, up to 2000m² for larger ones)
+    const landArea = Math.random() < 0.7
+      ? 50 + Math.random() * 450  // 70% of listings: 50-500m²
+      : 500 + Math.random() * 1500; // 30% of listings: 500-2000m²
+
     const variation = (Math.random() - 0.5) * 2 * priceVariation;
-    const price = basePrice * (1 + variation);
-    prices.push(Math.round(price / 1000000) * 1000000);
+    const pricePerSqmForListing = basePricePerSqm * (1 + variation);
+    const totalPrice = Math.round(pricePerSqmForListing * landArea);
+
+    prices.push(totalPrice);
+    pricesPerSqm.push(Math.round(pricePerSqmForListing));
   }
 
   prices.sort((a, b) => a - b);
+  pricesPerSqm.sort((a, b) => a - b);
+
+  const avgPrice = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+  const avgPricePerSqm = Math.round(pricesPerSqm.reduce((a, b) => a + b, 0) / pricesPerSqm.length);
 
   return {
     min: prices[0],
-    avg: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length),
+    avg: avgPrice,
     max: prices[prices.length - 1],
     median: prices[Math.floor(prices.length / 2)],
     listingCount,
-    trend: determineTrend(Math.round(prices.reduce((a, b) => a + b, 0) / prices.length), basePrice),
-    pricePerSqm: Math.round(basePrice / 100),
+    trend: determineTrend(avgPricePerSqm, basePricePerSqm),
+    pricePerSqm: avgPricePerSqm,
     sources: [
       { name: 'Dữ liệu ước tính dựa trên khu vực', type: 'estimated' }
     ],
@@ -611,7 +625,7 @@ function generateEstimatedPrices(lat: number, lng: number, radius: number): Mark
 function calculateBasePriceForLocation(lat: number, lng: number): number {
   const hcmcCenter = { lat: 10.8231, lng: 106.6297 };
   const hanoisCenter = { lat: 21.0285, lng: 105.8542 };
-  
+
   const distanceToHCMC = Math.sqrt(
     Math.pow(lat - hcmcCenter.lat, 2) + Math.pow(lng - hcmcCenter.lng, 2)
   );
@@ -619,17 +633,55 @@ function calculateBasePriceForLocation(lat: number, lng: number): number {
     Math.pow(lat - hanoisCenter.lat, 2) + Math.pow(lng - hanoisCenter.lng, 2)
   );
 
+  // Calculate realistic price per SQUARE METER for land plots
+  let pricePerSqm: number;
+
   if (distanceToHCMC < 0.05) {
-    return 120000000;
+    // HCMC center: 15-25 million VND/m²
+    pricePerSqm = 15000000 + Math.random() * 10000000;
   } else if (distanceToHCMC < 0.15) {
-    return 80000000;
+    // HCMC suburbs: 8-15 million VND/m²
+    pricePerSqm = 8000000 + Math.random() * 7000000;
   } else if (distanceToHanoi < 0.05) {
-    return 110000000;
+    // Hanoi center: 12-20 million VND/m²
+    pricePerSqm = 12000000 + Math.random() * 8000000;
   } else if (distanceToHanoi < 0.15) {
-    return 75000000;
+    // Hanoi suburbs: 6-12 million VND/m²
+    pricePerSqm = 6000000 + Math.random() * 6000000;
+  } else if (isIndustrialZone(lat, lng)) {
+    // Industrial zones (Bình Dương, Đồng Nai, etc.): 3-8 million VND/m²
+    pricePerSqm = 3000000 + Math.random() * 5000000;
   } else {
-    return 45000000 + Math.random() * 20000000;
+    // Other provinces: 2-6 million VND/m²
+    pricePerSqm = 2000000 + Math.random() * 4000000;
   }
+
+  // Return price per square meter (will be multiplied by area later)
+  return pricePerSqm;
+}
+
+function isIndustrialZone(lat: number, lng: number): boolean {
+  // Check if coordinates are in major industrial zones
+  const industrialZones = [
+    // Bình Dương area
+    { lat: 10.9041, lng: 106.6523, radius: 0.3 },  // Thủ Dầu Một
+    { lat: 10.8963, lng: 106.6314, radius: 0.2 },  // Dĩ An
+    { lat: 10.8606, lng: 106.7701, radius: 0.25 }, // Bình Dương
+    // Đồng Nai area
+    { lat: 10.9456, lng: 106.8448, radius: 0.3 },  // Biên Hòa
+    { lat: 10.7663, lng: 106.7010, radius: 0.25 }, // Long Thành
+    // Bình Phước area
+    { lat: 11.0447, lng: 106.6531, radius: 0.25 }, // Chơn Thành
+    // Tây Ninh area
+    { lat: 11.2945, lng: 106.1334, radius: 0.25 }, // Trảng Bom
+  ];
+
+  return industrialZones.some(zone => {
+    const distance = Math.sqrt(
+      Math.pow(lat - zone.lat, 2) + Math.pow(lng - zone.lng, 2)
+    );
+    return distance <= zone.radius;
+  });
 }
 
 function determineTrend(currentAvg: number, basePrice: number): 'up' | 'down' | 'stable' {
