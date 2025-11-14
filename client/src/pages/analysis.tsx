@@ -341,7 +341,11 @@ export default function AnalysisPage() {
                     />
                     <MarketPriceCard data={analysisResults.marketData} />
                   </TabsContent>
-                  <TabsContent value="amenities" className="p-4">
+                  <TabsContent value="amenities" className="p-4 space-y-4">
+                    <AmenityStatistics
+                      amenities={analysisResults.amenities}
+                      onAmenityClick={handleAmenityClick}
+                    />
                     <AmenityList amenities={analysisResults.amenities} />
                   </TabsContent>
                   <TabsContent value="risk" className="p-4">
