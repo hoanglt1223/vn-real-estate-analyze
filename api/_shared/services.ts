@@ -170,14 +170,14 @@ export async function searchLocations(query: string, limit: number = 10) {
   console.log(`🚀 COMPREHENSIVE SEARCH for: "${query}" with limit ${limit}`);
 
   try {
-    // API 1: Geocoding API (most reliable) - 50% of results
-    const geocodingPromise = fetchMapboxGeocoding(query, Math.ceil(limit * 0.5), token);
+    // API 1: Places API (highest priority for POIs) - 40% of results
+    const placesPromise = fetchMapboxPlaces(query, Math.ceil(limit * 0.4), token);
 
-    // API 2: Searchbox API (modern, session-based) - 30% of results
-    const searchboxPromise = fetchMapboxSearchbox(query, Math.ceil(limit * 0.3), token);
+    // API 2: Geocoding API (reliable for addresses) - 35% of results
+    const geocodingPromise = fetchMapboxGeocoding(query, Math.ceil(limit * 0.35), token);
 
-    // API 3: Places API (for POIs) - 20% of results
-    const placesPromise = fetchMapboxPlaces(query, Math.ceil(limit * 0.2), token);
+    // API 3: Searchbox API (general search) - 25% of results
+    const searchboxPromise = fetchMapboxSearchbox(query, Math.ceil(limit * 0.25), token);
 
     // Execute all APIs in parallel
     const [geocodingResults, searchboxResults, placesResults] = await Promise.allSettled([
@@ -190,10 +190,10 @@ export async function searchLocations(query: string, limit: number = 10) {
     const searchbox = searchboxResults.status === 'fulfilled' ? searchboxResults.value : [];
     const places = placesResults.status === 'fulfilled' ? placesResults.value : [];
 
-    console.log(`📊 API Results - Geocoding: ${geocoding.length}, Searchbox: ${searchbox.length}, Places: ${places.length}`);
+    console.log(`📊 API Results - Places: ${places.length}, Geocoding: ${geocoding.length}, Searchbox: ${searchbox.length}`);
 
-    // Combine all results
-    const allResults = [...geocoding, ...searchbox, ...places];
+    // Combine all results - POIs first for priority processing
+    const allResults = [...places, ...geocoding, ...searchbox];
 
     // Deduplicate by name/location
     const deduplicated = deduplicateResults(allResults);
@@ -432,37 +432,58 @@ function deduplicateResults(results: any[]): any[] {
 // Helper: Sort results by relevance
 function sortResultsByRelevance(results: any[], query: string): any[] {
   const queryLower = query.toLowerCase();
+  const queryWords = queryLower.split(' ').filter(w => w.length > 0);
 
   return results.sort((a, b) => {
-    // Exact matches first
-    const aExact = a.name.toLowerCase() === queryLower;
-    const bExact = b.name.toLowerCase() === queryLower;
+    const aNameLower = a.name.toLowerCase();
+    const bNameLower = b.name.toLowerCase();
+
+    // Exact matches first (highest priority)
+    const aExact = aNameLower === queryLower;
+    const bExact = bNameLower === queryLower;
     if (aExact && !bExact) return -1;
     if (!aExact && bExact) return 1;
 
+    // Enhanced brand name matching for known businesses
+    const knownBrands = ['gearvn', 'thế giới di động', 'tgdd', 'fpt shop', 'viettel store'];
+    const aIsBrand = knownBrands.some(brand => aNameLower.includes(brand) && queryLower.includes(brand));
+    const bIsBrand = knownBrands.some(brand => bNameLower.includes(brand) && queryLower.includes(brand));
+    if (aIsBrand && !bIsBrand) return -1;
+    if (!aIsBrand && bIsBrand) return 1;
+
+    // Calculate word overlap score for better matching
+    const aWordScore = calculateWordOverlap(queryWords, aNameLower);
+    const bWordScore = calculateWordOverlap(queryWords, bNameLower);
+    if (aWordScore !== bWordScore) return bWordScore - aWordScore;
+
     // Starts with matches
-    const aStarts = a.name.toLowerCase().startsWith(queryLower);
-    const bStarts = b.name.toLowerCase().startsWith(queryLower);
+    const aStarts = aNameLower.startsWith(queryLower);
+    const bStarts = bNameLower.startsWith(queryLower);
     if (aStarts && !bStarts) return -1;
     if (!aStarts && bStarts) return 1;
+
+    // Penalty for phonetic similarity but not exact (hoàng nhanh vs hòa hưng)
+    const aPhoneticPenalty = calculatePhoneticPenalty(queryLower, aNameLower);
+    const bPhoneticPenalty = calculatePhoneticPenalty(queryLower, bNameLower);
+    if (aPhoneticPenalty !== bPhoneticPenalty) return bPhoneticPenalty - aPhoneticPenalty;
 
     // Use API relevance score if available
     const aRelevance = a.relevance || 0;
     const bRelevance = b.relevance || 0;
     if (aRelevance !== bRelevance) return bRelevance - aRelevance;
 
-    // Priority order for types - POIs > Addresses > Places > Localities
+    // Priority order for types: POI > khu vực > địa chỉ > địa danh
     const typePriority = {
-      'poi': 5,      // Highest priority - businesses, shops, restaurants
-      'address': 4,  // High priority - specific addresses
-      'place': 3,    // Medium priority - landmarks, places of interest
-      'locality': 2, // Lower priority - areas, zones
-      'neighborhood': 1, // Lowest priority - neighborhoods
-      'district': 0,
-      'province': 0,
-      'region': 0,
-      'postcode': 0,
-      'country': 0
+      'poi': 4,        // Highest priority - POIs (shops, businesses, restaurants)
+      'locality': 3,   // High priority - khu vực (areas, zones)
+      'address': 2,    // Medium priority - địa chỉ (specific addresses)
+      'place': 1,      // Lower priority - địa danh (landmarks, places of interest)
+      'neighborhood': 1, // địa danh
+      'district': 0,    // Not in priority system
+      'province': 0,    // Not in priority system
+      'region': 0,      // Not in priority system
+      'postcode': 0,   // Not in priority system
+      'country': 0     // Not in priority system
     };
 
     const aPriority = typePriority[a.type] || 0;
@@ -473,4 +494,49 @@ function sortResultsByRelevance(results: any[], query: string): any[] {
     // Finally alphabetical
     return a.name.localeCompare(b.name, 'vi');
   });
+}
+
+// Helper: Calculate word overlap score
+function calculateWordOverlap(queryWords: string[], text: string): number {
+  const textWords = text.split(' ').filter(w => w.length > 0);
+  let overlap = 0;
+
+  for (const queryWord of queryWords) {
+    for (const textWord of textWords) {
+      if (queryWord === textWord || textWord.includes(queryWord) || queryWord.includes(textWord)) {
+        overlap += 1;
+        break;
+      }
+    }
+  }
+
+  return overlap;
+}
+
+// Helper: Calculate phonetic penalty for Vietnamese words
+function calculatePhoneticPenalty(query: string, text: string): number {
+  // Vietnamese phonetic similar pairs that often cause confusion
+  const phoneticPairs = [
+    ['hoàng', 'hòa'],
+    ['nhanh', 'hưng'],
+    ['nguyen', 'nguyễn'],
+    ['phong', 'phường'],
+    ['quan', 'quận'],
+    ['thanh', 'thành'],
+    ['ha', 'hà'],
+    ['hai', 'hai'],
+    ['nam', 'năm'],
+  ];
+
+  let penalty = 0;
+
+  for (const [word1, word2] of phoneticPairs) {
+    // If query has word1 and result has word2 (or vice versa), add penalty
+    if ((query.includes(word1) && text.includes(word2)) ||
+        (query.includes(word2) && text.includes(word1))) {
+      penalty += 10; // High penalty for phonetic confusion
+    }
+  }
+
+  return penalty;
 }
