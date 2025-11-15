@@ -156,14 +156,14 @@ const AMENITY_QUERIES: Record<string, AmenityQuery> = {
 };
 
 const INFRASTRUCTURE_QUERIES = {
-  roads: { query: '(way["highway"~"motorway|trunk|primary|secondary"]["name"];);', type: 'point' },
-  metro: { query: '(node["railway"="station"]["station"="subway"];way["railway"="subway"];);', type: 'point' },
-  bus_routes: { query: '(relation["route"="bus"]["name"];);', type: 'line' },
-  metro_lines: { query: '(relation["route"="subway"]["name"];);', type: 'line' },
-  industrial: { query: '(way["landuse"="industrial"];);', type: 'point' },
-  power: { query: '(node["power"="tower"];node["power"="substation"];);', type: 'point' },
-  cemetery: { query: '(way["landuse"="cemetery"];);', type: 'point' },
-  water: { query: '(way["waterway"~"river|canal|stream"]["name"];);', type: 'point' }
+  roads: { query: 'way["highway"~"motorway|trunk|primary|secondary|tertiary|residential"]', type: 'point' },
+  metro: { query: 'node["railway"="station"];way["railway"="station"]', type: 'point' },
+  bus_routes: { query: 'relation["route"="bus"];way["highway"="bus_stop"]', type: 'line' },
+  metro_lines: { query: 'relation["route"="subway"];relation["route"="light_rail"]', type: 'line' },
+  industrial: { query: 'way["landuse"="industrial"];node["landuse"="industrial"]', type: 'point' },
+  power: { query: 'node["power"="tower"];node["power"="substation"];way["power"="line"]', type: 'point' },
+  cemetery: { query: 'way["landuse"="cemetery"];node["landuse"="cemetery"]', type: 'point' },
+  water: { query: 'way["waterway"~"river|canal|stream|ditch"];node["waterway"~"river|canal|stream|ditch"]', type: 'point' }
 };
 
 export async function fetchAmenities(
@@ -314,8 +314,9 @@ export async function fetchInfrastructure(
         const isLineLayer = queryConfig.type === 'line';
         const overpassQuery = `
           [out:json][timeout:25];
-          ${queryConfig.query}
-          (around:${radius},${lat},${lng});
+          (
+            ${queryConfig.query}(around:${radius},${lat},${lng});
+          );
           ${isLineLayer ? '>;out geom;' : 'out center;'}
         `;
 
