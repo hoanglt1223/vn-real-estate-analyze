@@ -3,6 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import { polygon, area, bearing, point, centroid, circle, destination } from '@turf/turf';
 import SearchAutocomplete from './SearchAutocomplete';
+import MarkerCluster from './MarkerCluster';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
@@ -722,77 +723,53 @@ export default function MapView({
     });
   }, [infrastructure, selectedLayers, isLoaded, styleLoaded]);
 
-  useEffect(() => {
-    if (!map.current || !isLoaded) return;
+  // Use MarkerCluster for better performance with many amenities
+  return (
+    <div className="relative w-full h-full">
+      <div ref={mapContainer} className="w-full h-full" data-testid="map-container" />
+      <div className="absolute top-4 left-4 z-[100]">
+        <SearchAutocomplete onSelect={handleSearchSelect} />
+      </div>
+      <div className="absolute top-20 left-4 z-[100]">
+        <button
+          onClick={handleFindMyLocation}
+          className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm hover:bg-white dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+          title="Tìm vị trí hiện tại của bạn (Fallback cho macOS)"
+        >
+          📍 Vị trí của tôi
+        </button>
+      </div>
+      <div className="absolute top-32 left-4 z-[90] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm max-w-xs">
+        <p className="font-semibold text-gray-800 dark:text-gray-100 mb-1">💡 Hướng dẫn sử dụng:</p>
+        <p className="text-gray-600 dark:text-gray-300 text-xs">
+          <strong>Tự động tạo ô vuông:</strong><br/>
+          • 📍 Tìm vị trí: Chọn địa điểm ở thanh tìm kiếm<br/>
+          • 📍 Định vị: Bấm "Vị trí của tôi" hoặc nút định vị bản đồ<br/><br/>
+          <strong>Vẽ thủ công:</strong><br/>
+          1. Click vào icon <span className="inline-block w-6 h-6 align-middle">📐</span> ở góc trên bản đồ<br/>
+          2. Click lần lượt để đánh dấu các góc khu đất<br/>
+          3. Click vào điểm đầu tiên để hoàn thành polygon
+        </p>
+        <p className="text-gray-600 dark:text-gray-300 text-xs mt-2">
+          ✅ Khu đất 10m×10m sẽ được tự tạo khi bạn tìm hoặc định vị vị trí
+        </p>
+      </div>
 
-    markersRef.current.forEach(marker => marker.remove());
-    markersRef.current = [];
-
-    const filteredAmenities = amenities.filter(amenity => 
-      selectedCategories.length === 0 || selectedCategories.includes(amenity.category)
-    );
-
-    filteredAmenities.forEach(amenity => {
-      // Validate amenity coordinates before creating marker
-      if (!isValidCoordinate(amenity.lng, amenity.lat)) {
-        console.error('Invalid amenity coordinates:', amenity.name, [amenity.lng, amenity.lat]);
-        return;
-      }
-
-      const el = document.createElement('div');
-      el.className = 'amenity-marker';
-      el.style.width = '32px';
-      el.style.height = '32px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = categoryColors[amenity.category] || categoryColors.default;
-      el.style.color = 'white';
-      el.style.display = 'flex';
-      el.style.alignItems = 'center';
-      el.style.justifyContent = 'center';
-      el.style.fontSize = '16px';
-      el.style.cursor = 'pointer';
-      el.style.border = '2px solid white';
-      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-
-      let icon = categoryIcons[amenity.category] || categoryIcons.default;
-      if (amenity.category === 'transport' && amenity.type) {
-        icon = transportTypeIcons[amenity.type] || transportTypeIcons.default;
-      }
-      el.textContent = icon;
-
-      let educationType = '';
-      if (amenity.category === 'education') {
-        educationType = getEducationTypeLabel(amenity);
-        console.log('Education amenity:', amenity.name, 'Tags:', amenity.tags, 'Type:', educationType);
-      }
-
-      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
-        <div style="padding:8px;">
-          <strong style="font-size:14px;">${amenity.name}</strong>
-          ${educationType ? `<div style="margin-top:4px;font-size:12px;color:#3B82F6;font-weight:500;">
-            ${educationType}
-          </div>` : ''}
-          <div style="margin-top:4px;font-size:12px;color:#666;">
-            ${categoryVietnamese[amenity.category] || categoryVietnamese.default}
-          </div>
-          ${amenity.distance ? `<div style="margin-top:4px;font-size:12px;color:#666;">
-            Khoảng cách: ${Math.round(amenity.distance)}m
-          </div>` : ''}
-        </div>
-      `);
-
-      try {
-        const marker = new mapboxgl.Marker(el)
-          .setLngLat([amenity.lng, amenity.lat])
-          .setPopup(popup)
-          .addTo(map.current!);
-
-        markersRef.current.push(marker);
-      } catch (error) {
-        console.error('Error creating marker for amenity:', amenity.name, error);
-      }
-    });
-  }, [amenities, selectedCategories, isLoaded, styleLoaded]);
+      {/* Add MarkerCluster component */}
+      {map.current && isLoaded && (
+        <MarkerCluster
+          map={map.current}
+          amenities={amenities}
+          selectedCategories={selectedCategories}
+          categoryColors={categoryColors}
+          categoryIcons={categoryIcons}
+          transportTypeIcons={transportTypeIcons}
+          categoryVietnamese={categoryVietnamese}
+          getEducationTypeLabel={getEducationTypeLabel}
+        />
+      )}
+    </div>
+  );
 
   const handleFindMyLocation = () => {
     if (!map.current || !draw.current) return;

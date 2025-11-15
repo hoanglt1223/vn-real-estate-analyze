@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 interface PDFData {
   propertyData: {
@@ -18,15 +19,22 @@ export async function generatePDF(data: PDFData) {
   const margin = 15;
   let yPos = margin;
 
+  // Add header with better formatting
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(20);
+  pdf.setFontSize(22);
   pdf.text('BÁO CÁO PHÂN TÍCH BẤT ĐỘNG SẢN', pageWidth / 2, yPos, { align: 'center' });
-  yPos += 15;
+  yPos += 10;
 
   pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(10);
-  pdf.text(`Ngày tạo: ${new Date().toLocaleDateString('vi-VN')}`, pageWidth / 2, yPos, { align: 'center' });
+  pdf.setFontSize(11);
+  pdf.text(`Ngày tạo: ${new Date().toLocaleDateString('vi-VN')} lúc ${new Date().toLocaleTimeString('vi-VN')}`, pageWidth / 2, yPos, { align: 'center' });
   yPos += 15;
+
+  // Add decorative line
+  pdf.setDrawColor(3, 169, 244); // Blue color
+  pdf.setLineWidth(0.5);
+  pdf.line(margin, yPos, pageWidth - margin, yPos);
+  yPos += 10;
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(14);
@@ -48,27 +56,45 @@ export async function generatePDF(data: PDFData) {
     const mapElement = document.querySelector('[data-testid="map-container"]') as HTMLElement;
     if (mapElement) {
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(14);
-      pdf.text('BẢN ĐỒ VỊ TRÍ', margin, yPos);
+      pdf.setFontSize(16);
+      pdf.text('BẢN ĐỒ VỊ TRÍ VÀ TIỆN ÍCH', margin, yPos);
       yPos += 8;
 
+      // Enhanced map capture with better quality
       const canvas = await html2canvas(mapElement, {
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        scale: 2, // Higher resolution
+        logging: false,
+        width: mapElement.offsetWidth,
+        height: mapElement.offsetHeight
       });
-      
-      const imgData = canvas.toDataURL('image/jpeg', 0.8);
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.9);
       const imgWidth = pageWidth - (2 * margin);
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
+
       if (yPos + imgHeight > pageHeight - margin) {
         pdf.addPage();
         yPos = margin;
       }
-      
+
+      // Add border around map image
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setLineWidth(0.5);
+      pdf.rect(margin - 1, yPos - 1, imgWidth + 2, imgHeight + 2);
+
       pdf.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
-      yPos += imgHeight + 10;
+      yPos += imgHeight + 15;
+
+      // Add map legend
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('Bản đồ hiển thị vị trí khu đất và các tiện ích xung quanh', margin, yPos);
+      pdf.setTextColor(0, 0, 0);
+      yPos += 8;
     }
   } catch (error) {
     console.error('Error capturing map:', error);
@@ -79,16 +105,33 @@ export async function generatePDF(data: PDFData) {
     yPos = margin;
   }
 
+  // Add section separator
+  if (yPos > pageHeight - 40) {
+    pdf.addPage();
+    yPos = margin;
+  }
+
+  pdf.setDrawColor(3, 169, 244);
+  pdf.setLineWidth(0.3);
+  pdf.line(margin, yPos, pageWidth - margin, yPos);
+  yPos += 8;
+
   if (data.analysisResults?.aiAnalysis) {
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
+    pdf.setFontSize(16);
     pdf.text('ĐÁNH GIÁ TỪ AI', margin, yPos);
-    yPos += 8;
+    yPos += 10;
 
     const scores = data.analysisResults.aiAnalysis.scores;
+
+    // Draw score visualization
+    if (scores) {
+      yPos += drawScoreChart(pdf, scores, margin, yPos, pageWidth - (2 * margin));
+    }
+
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(11);
-    
+
     pdf.text(`Điểm vị trí: ${scores?.location || 'N/A'}/10`, margin, yPos);
     yPos += 6;
     pdf.text(`Điểm tiện ích: ${scores?.amenities || 'N/A'}/10`, margin, yPos);
@@ -274,8 +317,114 @@ export async function generatePDF(data: PDFData) {
   }
 
   pdf.setTextColor('#000000');
+  // Add watermark and footer
+  addWatermarkAndFooter(pdf);
+
   const fileName = `bao-cao-phan-tich-${Date.now()}.pdf`;
   pdf.save(fileName);
-  
+
   return fileName;
+}
+
+// Helper function to draw score chart
+function drawScoreChart(pdf: jsPDF, scores: any, x: number, y: number, width: number): number {
+  const barHeight = 8;
+  const spacing = 4;
+  const chartHeight = (barHeight + spacing) * 5 + 10;
+  const barWidth = width * 0.7;
+  const labelWidth = width * 0.25;
+
+  const scoreCategories = [
+    { key: 'location', label: 'Vị trí' },
+    { key: 'amenities', label: 'Tiện ích' },
+    { key: 'infrastructure', label: 'Hạ tầng' },
+    { key: 'potential', label: 'Tiềm năng' },
+    { key: 'overall', label: 'Tổng thể' }
+  ];
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+
+  let currentY = y;
+  scoreCategories.forEach(category => {
+    const score = scores[category.key] || 0;
+    const normalizedScore = (score / 10) * barWidth;
+
+    // Draw background bar
+    pdf.setFillColor(240, 240, 240);
+    pdf.rect(x + labelWidth, currentY, barWidth, barHeight, 'F');
+
+    // Draw score bar with color based on score
+    if (score >= 8) {
+      pdf.setFillColor(16, 185, 129); // Green
+    } else if (score >= 6) {
+      pdf.setFillColor(251, 146, 60); // Orange
+    } else {
+      pdf.setFillColor(239, 68, 68); // Red
+    }
+    pdf.rect(x + labelWidth, currentY, normalizedScore, barHeight, 'F');
+
+    // Draw border
+    pdf.setDrawColor(200, 200, 200);
+    pdf.setLineWidth(0.5);
+    pdf.rect(x + labelWidth, currentY, barWidth, barHeight);
+
+    // Draw label
+    pdf.setTextColor(60, 60, 60);
+    pdf.text(`${category.label}:`, x, currentY + 6);
+
+    // Draw score value
+    pdf.setTextColor(30, 30, 30);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`${score}/10`, x + labelWidth + barWidth + 5, currentY + 6);
+    pdf.setFont('helvetica', 'normal');
+
+    currentY += barHeight + spacing;
+  });
+
+  return chartHeight;
+}
+
+// Helper function to add watermark and footer
+function addWatermarkAndFooter(pdf: jsPDF) {
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const pageCount = pdf.internal.getNumberOfPages();
+
+  for (let i = 1; i <= pageCount; i++) {
+    pdf.setPage(i);
+
+    // Add watermark
+    pdf.setTextColor(240, 240, 240);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(60);
+    pdf.saveGraphicsState();
+    pdf.setGState(new pdf.GState({ opacity: 0.1 }));
+    pdf.text('Vietnam Real Estate Analysis', pageWidth / 2, pageHeight / 2, {
+      align: 'center',
+      angle: 45
+    });
+    pdf.restoreGraphicsState();
+
+    // Add footer
+    pdf.setTextColor(100, 100, 100);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(8);
+    pdf.text('Báo cáo này được tạo tự động bởi hệ thống phân tích bất động sản Việt Nam', pageWidth / 2, pageHeight - 10, {
+      align: 'center'
+    });
+
+    // Add page number
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Trang ${i} / ${pageCount}`, pageWidth - 25, pageHeight - 5);
+
+    // Add disclaimer
+    pdf.setFontSize(7);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('* Thông tin chỉ mang tính chất tham khảo, vui lòng xác thực lại trước khi ra quyết định', pageWidth / 2, pageHeight - 5, {
+      align: 'center'
+    });
+  }
+
+  pdf.setTextColor(0, 0, 0); // Reset text color
 }

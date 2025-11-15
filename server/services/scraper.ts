@@ -204,15 +204,15 @@ export async function fetchFromBatdongsan(lat: number, lng: number, radius: numb
 }
 
 async function fetchBatdongsanDirectly(url: string): Promise<PriceListing[]> {
-  const maxRetries = 3;
-  const timeoutMs = 15000; // 15 seconds timeout
+  const maxRetries = 2; // Reduced retries for faster performance
+  const timeoutMs = 10000; // 10 seconds timeout for faster response
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Random delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+      // Reduced delay for faster response
+      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
 
-      console.log(`Attempt ${attempt}/${maxRetries} for ${url}`);
+      console.log(`Batdongsan attempt ${attempt}/${maxRetries} for ${url}`);
 
       // Create AbortController for timeout
       const controller = new AbortController();
@@ -222,39 +222,32 @@ async function fetchBatdongsanDirectly(url: string): Promise<PriceListing[]> {
         method: 'GET',
         signal: controller.signal,
         headers: {
-          // Realistic browser headers
+          // Optimized headers for better success rate
           'User-Agent': getRandomUserAgent(),
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
           'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8',
           'Accept-Encoding': 'gzip, deflate, br',
           'DNT': '1',
           'Connection': 'keep-alive',
           'Upgrade-Insecure-Requests': '1',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Cache-Control': 'max-age=0',
-          'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"',
-          'Referer': 'https://www.google.com/',
-          // Add cookie header to simulate returning user
-          'Cookie': generateRandomCookie()
-        },
-        redirect: 'follow'
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Referer': 'https://www.google.com/search?q=batdongsan',
+          // Simulate real user session
+          'Cookie': generateRealisticCookie()
+        }
       });
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.log(`HTTP ${response.status} for ${url} (attempt ${attempt}/${maxRetries})`);
-        if (response.status === 403) {
-          // 403 means blocked, no point in retrying immediately
+        if (response.status === 403 || response.status === 429) {
+          console.log('Rate limited or blocked, skipping retries');
           break;
         }
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 5000 * attempt)); // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
           continue;
         }
         return [];
@@ -262,34 +255,40 @@ async function fetchBatdongsanDirectly(url: string): Promise<PriceListing[]> {
 
       const html = await response.text();
 
+      // Quick validation before parsing
+      if (!html.includes('bất động sản') && !html.includes('Bất động sản') && html.length < 1000) {
+        console.log('Invalid HTML response, likely blocked');
+        continue;
+      }
+
       // Parse HTML to extract listings
       const listings = parseBatdongsanHTML(html, url);
 
       if (listings.length > 0) {
-        console.log(`Successfully parsed ${listings.length} listings from ${url}`);
+        console.log(`Successfully parsed ${listings.length} listings from Batdongsan`);
         return listings;
       } else if (attempt < maxRetries) {
         console.log(`No listings found, retrying... (attempt ${attempt}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
         continue;
       }
 
     } catch (error) {
-      console.error(`Error fetching Batdongsan URL (attempt ${attempt}/${maxRetries}):`, error.message);
+      console.error(`Error fetching Batdongsan (attempt ${attempt}/${maxRetries}):`, error.message);
 
       if (error.name === 'AbortError') {
         console.log('Request timed out');
       }
 
       if (attempt < maxRetries) {
-        console.log(`Retrying in ${5 * attempt} seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 5000 * attempt));
+        console.log(`Retrying in ${3 * attempt} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
         continue;
       }
     }
   }
 
-  console.log(`All ${maxRetries} attempts failed for ${url}`);
+  console.log(`Batdongsan: All ${maxRetries} attempts failed, using fallback`);
   return [];
 }
 
@@ -305,47 +304,68 @@ function getRandomUserAgent(): string {
   return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
 
-function generateRandomCookie(): string {
-  const cookies = [
-    'device_view=desktop; _ga=GA1.2.1234567890.1234567890; _gid=GA1.2.1234567890.1234567890',
-    'PHPSESSID=' + Math.random().toString(36).substring(2, 15) + '; _fbp=fb.1.1234567890.1234567890',
-    '_gat=1; _ga=GA1.2.9876543210.9876543210; _gid=GA1.2.9876543210.9876543210',
-    'cookieconsent_status=dismiss; _ga=GA1.3.5555555555.5555555555; _gid=GA1.3.5555555555.5555555555'
-  ];
-  return cookies[Math.floor(Math.random() * cookies.length)];
+function generateRealisticCookie(): string {
+  const sessionId = Math.random().toString(36).substring(2, 15);
+  const timestamp = Date.now();
+  const randomNum = Math.floor(Math.random() * 1000000000);
+
+  return [
+    `device_view=desktop; PHPSESSID=${sessionId}`,
+    `_ga=GA1.2.${randomNum}.${timestamp}`,
+    `_gid=GA1.2.${randomNum}.${timestamp}`,
+    `cookieconsent_status=dismiss`,
+    `_fbp=fb.1.${timestamp}.${randomNum}`
+  ].join('; ');
 }
 
 function parseBatdongsanHTML(html: string, baseUrl: string): PriceListing[] {
   const listings: PriceListing[] = [];
 
   try {
-    // Look for JSON script tags with listing data
-    const jsonScriptMatches = html.match(/<script[^>]*>[\s\S]*?window\.__INITIAL_STATE__[\s\S]*?<\/script>/gi);
+    // Look for various JSON data patterns used by Batdongsan
+    const jsonPatterns = [
+      /<script[^>]*>[\s\S]*?window\.__INITIAL_STATE__[\s\S]*?<\/script>/gi,
+      /<script[^>]*>[\s\S]*?window\.__NUXT__[\s\S]*?<\/script>/gi,
+      /<script[^>]*>[\s\S]*?window\.__REDUX_STATE__[\s\S]*?<\/script>/gi
+    ];
 
-    if (jsonScriptMatches && jsonScriptMatches.length > 0) {
-      for (const script of jsonScriptMatches) {
-        try {
-          const jsonMatch = script.match(/window\.__INITIAL_STATE__\s*=\s*({[\s\S]*?});?\s*<\/script>/);
-          if (jsonMatch) {
-            const jsonData = JSON.parse(jsonMatch[1]);
-            const products = jsonData?.product?.productList || jsonData?.products || [];
+    for (const pattern of jsonPatterns) {
+      const matches = html.match(pattern);
+      if (matches && matches.length > 0) {
+        console.log(`Found JSON data with pattern: ${pattern}`);
+        for (const script of matches) {
+          try {
+            const jsonMatch = script.match(/window\.(?:__INITIAL_STATE__|__NUXT__|__REDUX_STATE__)\s*=\s*({[\s\S]*?});?\s*<\/script>/);
+            if (jsonMatch) {
+              const jsonData = JSON.parse(jsonMatch[1]);
 
-            for (const product of products) {
-              const listing = parseBatdongsanProduct(product);
-              if (listing) {
-                listings.push(listing);
+              // Try different data structure paths
+              const products = jsonData?.product?.productList ||
+                             jsonData?.products ||
+                             jsonData?.ads?.ads ||
+                             jsonData?.data?.products ||
+                             jsonData?.items ||
+                             [];
+
+              console.log(`Found ${products.length} products in JSON data`);
+
+              for (const product of products) {
+                const listing = parseBatdongsanProduct(product);
+                if (listing) {
+                  listings.push(listing);
+                }
               }
             }
+          } catch (e) {
+            console.error('Error parsing Batdongsan JSON data:', e.message);
           }
-        } catch (e) {
-          console.error('Error parsing Batdongsan JSON data:', e);
         }
       }
     }
 
-    // Fallback: HTML parsing if JSON not found
+    // Enhanced HTML parsing if JSON parsing failed
     if (listings.length === 0) {
-      console.log('JSON data not found, trying HTML parsing...');
+      console.log('JSON data not found or failed, trying enhanced HTML parsing...');
       const htmlListings = parseBatdongsanHTMLFallback(html, baseUrl);
       listings.push(...htmlListings);
     }
@@ -539,37 +559,68 @@ async function fetchFromChotot(lat: number, lng: number, radius: number): Promis
   try {
     console.log('Fetching data from Chotot.com...');
 
-    // Chotot.com search URL for real estate
-    const searchUrl = `https://nha.chotot.com/mua-ban-nha-dat/${locationSlug}`;
+    // Try multiple URL patterns for Chotot
+    const urls = [
+      `https://nha.chotot.com/mua-ban-nha-dat/${locationSlug}`,
+      `https://www.chotot.vn/mua-ban-nha-dat/${locationSlug}`,
+      `https://nha.chotot.com/tp-ho-chi-minh/mua-ban-nha-dat`,
+      `https://www.chotot.vn/tp-ho-chi-minh/mua-ban-nha-dat`
+    ];
 
-    // Use a web scraping approach with headers to mimic a browser
-    const response = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'vi-VN,vi;q=0.8,en-US;q=0.5,en;q=0.3',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-      },
-    });
+    let listings: PriceListing[] = [];
 
-    if (!response.ok) {
-      throw new Error(`Chotot.com HTTP error: ${response.status}`);
+    for (const url of urls) {
+      try {
+        console.log(`Trying Chotot URL: ${url}`);
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'User-Agent': getRandomUserAgent(),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'no-cache',
+            'Referer': 'https://www.google.com/search?q=chotot+nha+dat',
+            'Cookie': generateRealisticCookie()
+          },
+          signal: AbortSignal.timeout(10000) // 10 second timeout
+        });
+
+        if (!response.ok) {
+          console.log(`HTTP ${response.status} for ${url}`);
+          continue;
+        }
+
+        const html = await response.text();
+
+        // Quick validation
+        if (!html.includes('nhà đất') && !html.includes('bất động sản') && html.length < 2000) {
+          console.log(`Invalid response from ${url}`);
+          continue;
+        }
+
+        // Parse HTML to extract listing data
+        const urlListings = parseChototHTML(html);
+
+        if (urlListings.length > 0) {
+          console.log(`Successfully parsed ${urlListings.length} listings from ${url}`);
+          listings.push(...urlListings);
+          break; // Use first successful URL
+        }
+
+      } catch (error) {
+        console.log(`Error with ${url}:`, error.message);
+        continue;
+      }
     }
-
-    const html = await response.text();
-
-    // Parse HTML to extract listing data
-    const listings = parseChototHTML(html);
-
-    console.log(`Successfully parsed ${listings.length} listings from Chotot.com`);
 
     return { listings };
 
   } catch (error) {
     console.error('Error fetching from Chotot.com:', error);
-    // Return empty results instead of throwing to allow other sources to work
     return { listings: [] };
   }
 }
