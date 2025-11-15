@@ -30,7 +30,7 @@ export async function fetchWithCache<T>(
   const cachedResult = cache.get(cacheKey);
   if (cachedResult !== null) {
     console.log(`Cache hit for ${cacheType}:`, keyParams);
-    return cachedResult;
+    return cachedResult as T;
   }
 
   console.log(`Cache miss for ${cacheType}:`, keyParams);

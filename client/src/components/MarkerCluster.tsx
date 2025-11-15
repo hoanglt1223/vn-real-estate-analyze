@@ -2,6 +2,9 @@ import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import * as supercluster from 'supercluster';
 
+// Type definition for supercluster instance
+type SuperclusterInstance = any;
+
 interface Amenity {
   id: string;
   name: string;
@@ -48,7 +51,7 @@ export default function MarkerCluster({
   categoryVietnamese,
   getEducationTypeLabel
 }: ClusterProps) {
-  const clusterRef = useRef<supercluster.Supercluster<any, any> | null>(null);
+  const clusterRef = useRef<SuperclusterInstance | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const sourceId = 'cluster-source';
   const clusterLayerId = 'cluster-layer';

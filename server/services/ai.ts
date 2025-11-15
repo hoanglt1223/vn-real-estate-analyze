@@ -17,87 +17,103 @@ export interface AIAnalysisInput {
 export interface AIAnalysisResult {
   scores: {
     overall: number;
+    location: number;
     amenities: number;
-    planning: number;
-    residential: number;
-    investment: number;
-    risk: number;
+    infrastructure: number;
+    potential: number;
   };
   scoreExplanations: {
     overall: string;
+    location: string;
     amenities: string;
-    planning: string;
-    residential: string;
-    investment: string;
-    risk: string;
+    infrastructure: string;
+    potential: string;
   };
   recommendation: 'buy' | 'consider' | 'avoid';
-  estimatedPrice: number;
+  estimatedPrice: string;
   summary: string;
+  amenityAnalysis: {
+    explanation: string;
+    improvements: string[];
+    importance: Record<string, string>;
+  };
+  areaComparison: {
+    similarAreas: string[];
+    advantages: string[];
+    disadvantages: string[];
+  };
+  investmentTimeline: {
+    shortTerm: string;
+    midTerm: string;
+    longTerm: string;
+  };
 }
 
 export async function analyzeProperty(input: AIAnalysisInput): Promise<AIAnalysisResult> {
+  const locationScore = calculateLocationScore(input.amenities, input.infrastructure);
   const amenitiesScore = calculateAmenitiesScore(input.amenities);
-  const planningScore = calculatePlanningScore(input.infrastructure);
-  const riskScore = calculateRiskScore(input.risks);
-  const residentialScore = calculateResidentialScore(input.amenities, input.risks, input.orientation);
-  const investmentScore = calculateInvestmentScore(input.marketData, input.infrastructure, input.area);
+  const infrastructureScore = calculatePlanningScore(input.infrastructure);
+  const potentialScore = calculateInvestmentScore(input.marketData, input.infrastructure, input.area);
 
   const overall = Math.round(
+    (locationScore * 0.25) +
     (amenitiesScore * 0.25) +
-    (planningScore * 0.2) +
-    ((100 - riskScore) * 0.2) +
-    (residentialScore * 0.2) +
-    (investmentScore * 0.15)
+    (infrastructureScore * 0.2) +
+    (potentialScore * 0.3)
   );
 
   let recommendation: 'buy' | 'consider' | 'avoid';
-  if (overall >= 70 && riskScore < 30) {
+  if (overall >= 80) {
     recommendation = 'buy';
-  } else if (overall >= 50 || riskScore < 50) {
+  } else if (overall >= 60) {
     recommendation = 'consider';
   } else {
     recommendation = 'avoid';
   }
 
-  const estimatedPrice = input.marketData?.avg || 0;
+  const estimatedPrice = input.marketData?.avg ?
+    `${input.marketData.avg.toLocaleString('vi-VN')} VNĐ/m²` :
+    'Không có dữ liệu';
 
   const summary = await generateAISummary(input, {
     overall,
+    locationScore,
     amenitiesScore,
-    planningScore,
-    residentialScore,
-    investmentScore,
-    riskScore
+    infrastructureScore,
+    potentialScore
   });
 
   const scoreObject = {
     overall,
+    location: locationScore,
     amenities: amenitiesScore,
-    planning: planningScore,
-    residential: residentialScore,
-    investment: investmentScore,
-    risk: riskScore
+    infrastructure: infrastructureScore,
+    potential: potentialScore
   };
 
   const explanations = generateScoreExplanations(input, scoreObject);
+  const amenityAnalysis = generateAmenityAnalysis(input);
+  const areaComparison = generateAreaComparison(input);
+  const investmentTimeline = generateInvestmentTimeline(input, overall);
 
   return {
     scores: scoreObject,
     scoreExplanations: explanations,
     recommendation,
     estimatedPrice,
-    summary
+    summary,
+    amenityAnalysis,
+    areaComparison,
+    investmentTimeline
   };
 }
 
 interface ScoreObject {
   overall: number;
+  location: number;
   amenities: number;
-  planning: number;
-  residential: number;
-  investment: number;
-  risk: number;
+  infrastructure: number;
+  potential: number;
 }
 
 function generateScoreExplanations(input: AIAnalysisInput, scores: ScoreObject) {
@@ -112,25 +128,28 @@ function generateScoreExplanations(input: AIAnalysisInput, scores: ScoreObject) 
   const trend = input.marketData?.trend || 'stable';
   const risksCount = input.risks?.length || 0;
   
+  const locationValue = scores.location || 0;
   const amenitiesValue = scores.amenities || 0;
-  const planningValue = scores.planning || 0;
-  const residentialValue = scores.residential || 0;
-  const investmentValue = scores.investment || 0;
-  const riskValue = scores.risk || 0;
+  const infrastructureValue = scores.infrastructure || 0;
+  const potentialValue = scores.potential || 0;
   const overallValue = scores.overall || 0;
+
+  // Count amenity types for location explanation
+  const educationCount = input.amenities?.filter(a => a.category === 'education').length || 0;
+  const healthcareCount = input.amenities?.filter(a => a.category === 'healthcare').length || 0;
+  const shoppingCount = input.amenities?.filter(a => a.category === 'shopping').length || 0;
+  const transportCount = input.amenities?.filter(a => a.category === 'transport').length || 0;
   
   return {
-    overall: `Điểm tổng hợp từ: Tiện ích (25%), Quy hoạch (20%), Rủi ro (20%), An cư (20%), Đầu tư (15%). Công thức: (${amenitiesValue}×0.25 + ${planningValue}×0.2 + ${100-riskValue}×0.2 + ${residentialValue}×0.2 + ${investmentValue}×0.15) = ${overallValue}`,
-    
+    overall: `Điểm tổng hợp từ: Vị trí (25%), Tiện ích (25%), Hạ tầng (20%), Tiềm năng (30%). Công thức: (${locationValue}×0.25 + ${amenitiesValue}×0.25 + ${infrastructureValue}×0.2 + ${potentialValue}×0.3) = ${overallValue}`,
+
+    location: `Dựa trên kết nối và đa dạng tiện ích. ${educationCount > 0 ? '+20 (có giáo dục)' : ''} ${healthcareCount > 0 ? '+15 (có y tế)' : ''} ${shoppingCount > 0 ? '+10 (có mua sắm)' : ''} ${transportCount > 0 ? '+15 (có giao thông)' : ''} ${metroCount > 0 ? '+10 (gần metro)' : ''} ${roadsCount >= 3 ? '+5 (nhiều đường)' : ''}.`,
+
     amenities: `Dựa trên ${amenitiesCount} tiện ích xung quanh. ${closeAmenities} địa điểm trong bán kính 1km (+10 điểm/địa điểm), ${mediumAmenities} địa điểm trong 1-3km (+5 điểm/địa điểm). Tối đa 25 điểm/danh mục.`,
-    
-    planning: `Điểm cơ bản 50. ${roadsCount > 0 ? '+15 (có đường lớn)' : ''} ${metroCount > 0 ? '+20 (có metro)' : ''} ${waterCount > 0 ? '+10 (gần sông/kênh)' : ''}. Tối đa 100 điểm.`,
-    
-    residential: `Điểm cơ bản 60. Trường học gần (+5/trường, max 15), Y tế gần (+3/nơi, max 10), Mua sắm gần (+3/nơi, max 10). ${['Đông', 'Đông Nam', 'Nam'].includes(input.orientation) ? '+5 (hướng tốt)' : ''}. Trừ điểm nếu có rủi ro cao (-15/rủi ro).`,
-    
-    investment: `Điểm cơ bản 50. ${trend === 'up' ? '+15 (giá tăng)' : trend === 'down' ? '-10 (giá giảm)' : '+0 (giá ổn định)'}. ${metroCount > 0 ? '+20 (có metro)' : ''} ${roadsCount >= 3 ? '+10 (nhiều đường lớn)' : ''}. ${input.area > 100 && input.area < 500 ? '+5 (diện tích phù hợp)' : ''}.`,
-    
-    risk: `Điểm cơ bản 10. Mỗi rủi ro cao +30, trung bình +15, thấp +5. Tổng ${risksCount} rủi ro được phát hiện. Điểm càng thấp càng tốt.`
+
+    infrastructure: `Điểm cơ bản 50. ${roadsCount > 0 ? '+15 (có đường lớn)' : ''} ${metroCount > 0 ? '+20 (có metro)' : ''} ${waterCount > 0 ? '+10 (gần sông/kênh)' : ''}. Tối đa 100 điểm.`,
+
+    potential: `Điểm cơ bản 50. ${trend === 'up' ? '+15 (giá tăng)' : trend === 'down' ? '-10 (giá giảm)' : '+0 (giá ổn định)'}. ${metroCount > 0 ? '+20 (có metro)' : ''} ${roadsCount >= 3 ? '+10 (nhiều đường lớn)' : ''} ${input.area > 100 && input.area < 500 ? '+5 (diện tích phù hợp)' : ''}.`
   };
 }
 
@@ -324,4 +343,162 @@ function formatPrice(price: number): string {
     return `${(price / 1000000000).toFixed(1)} tỷ VNĐ`;
   }
   return `${(price / 1000000).toFixed(0)} triệu VNĐ`;
+}
+
+// New functions for enhanced AI analysis
+function calculateLocationScore(amenities: any[] | undefined, infrastructure: any | undefined): number {
+  let score = 50;
+
+  if (!amenities) amenities = [];
+
+  // Score based on amenity density and variety
+  const educationCount = amenities.filter(a => a.category === 'education').length;
+  const healthcareCount = amenities.filter(a => a.category === 'healthcare').length;
+  const shoppingCount = amenities.filter(a => a.category === 'shopping').length;
+  const transportCount = amenities.filter(a => a.category === 'transport').length;
+
+  score += Math.min(20, educationCount * 3);
+  score += Math.min(15, healthcareCount * 3);
+  score += Math.min(10, shoppingCount * 2);
+  score += Math.min(15, transportCount * 2);
+
+  // Infrastructure bonus
+  if (infrastructure?.metro?.length > 0) score += 10;
+  if (infrastructure?.roads?.length >= 3) score += 5;
+
+  return Math.min(100, score);
+}
+
+function generateAmenityAnalysis(input: AIAnalysisInput): AIAnalysisResult['amenityAnalysis'] {
+  const explanation = generateAmenityExplanation(input.amenities);
+  const improvements = generateImprovementSuggestions(input.amenities);
+  const importance = generateAmenityImportance(input.amenities);
+
+  return {
+    explanation,
+    improvements,
+    importance
+  };
+}
+
+function generateAmenityExplanation(amenities: any[] | undefined): string {
+  if (!amenities || amenities.length === 0) {
+    return "Không có tiện ích xung quanh khu vực này. Điều này có thể ảnh hưởng đến sự tiện nghi và giá trị bất động sản.";
+  }
+
+  const educationCount = amenities.filter(a => a.category === 'education').length;
+  const healthcareCount = amenities.filter(a => a.category === 'healthcare').length;
+  const shoppingCount = amenities.filter(a => a.category === 'shopping').length;
+
+  let explanation = `Khu vực có ${amenities.length} tiện ích trong bán kính 1km. `;
+
+  if (educationCount > 0) {
+    explanation += `Có ${educationCount} cơ sở giáo dục, thuận lợi cho gia đình có con nhỏ. `;
+  }
+
+  if (healthcareCount > 0) {
+    explanation += `${healthcareCount} cơ sở y tế gần đó đảm bảo khả năng tiếp cận dịch vụ sức khỏe. `;
+  }
+
+  if (shoppingCount > 0) {
+    explanation += `${shoppingCount} điểm mua sắm đáp ứng nhu cầu hàng ngày. `;
+  }
+
+  return explanation;
+}
+
+function generateImprovementSuggestions(amenities: any[] | undefined): string[] {
+  const suggestions: string[] = [];
+  if (!amenities) amenities = [];
+
+  const education = amenities.filter(a => a.category === 'education');
+  const healthcare = amenities.filter(a => a.category === 'healthcare');
+  const shopping = amenities.filter(a => a.category === 'shopping');
+
+  if (education.length === 0) {
+    suggestions.push("Khu vực thiếu trường học, cần xem xét phương tiện đi lại cho học sinh");
+  }
+
+  if (healthcare.length === 0) {
+    suggestions.push("Cần phát triển thêm cơ sở y tế để phục vụ cộng đồng");
+  }
+
+  if (shopping.length < 2) {
+    suggestions.push("Nên có thêm các cửa hàng tiện lợi và chợ/siêu thị");
+  }
+
+  suggestions.push("Cải thiện giao thông kết nối các tiện ích hiện có");
+  suggestions.push("Phát triển không gian công cộng và công viên xanh");
+
+  return suggestions;
+}
+
+function generateAmenityImportance(amenities: any[] | undefined): Record<string, string> {
+  const importance: Record<string, string> = {};
+
+  // Education importance
+  const education = amenities?.filter(a => a.category === 'education') || [];
+  if (education.length > 0) {
+    importance['education'] = `Quan trọng cho gia đình có con nhỏ (${education.length} trường nearby)`;
+  } else {
+    importance['education'] = 'Thiếu trường học, cần xem xét phương tiện di chuyển';
+  }
+
+  // Healthcare importance
+  const healthcare = amenities?.filter(a => a.category === 'healthcare') || [];
+  if (healthcare.length > 0) {
+    importance['healthcare'] = `Đảm bảo tiếp cận dịch vụ y tế (${healthcare.length} cơ sở)`;
+  } else {
+    importance['healthcare'] = 'Cần phát triển thêm cơ sở y tế';
+  }
+
+  // Shopping importance
+  const shopping = amenities?.filter(a => a.category === 'shopping') || [];
+  if (shopping.length > 0) {
+    importance['shopping'] = `Tiện lợi cho mua sắm hàng ngày (${shopping.length} điểm)`;
+  } else {
+    importance['shopping'] = 'Thiếu các cửa hàng tiện lợi';
+  }
+
+  return importance;
+}
+
+function generateAreaComparison(input: AIAnalysisInput): AIAnalysisResult['areaComparison'] {
+  return {
+    similarAreas: [
+      "Quận 7 - Khu dân cư mới với nhiều tiện ích",
+      "Quận 2 - Phát triển mạnh về hạ tầng",
+      "Quận Bình Thạnh - Khu vực sôi động, nhiều dịch vụ"
+    ],
+    advantages: [
+      "Vị trí trung tâm, dễ dàng di chuyển",
+      "Tiềm năng tăng giá trong tương lai",
+      "Cộng đồng dân cư văn minh"
+    ],
+    disadvantages: [
+      "Giá đất tương đối cao",
+      "Có thể đông đúc vào giờ cao điểm",
+      "Một số tiện ích cần phát triển thêm"
+    ]
+  };
+}
+
+function generateInvestmentTimeline(input: AIAnalysisInput, overallScore: number): AIAnalysisResult['investmentTimeline'] {
+  const shortTerm = overallScore >= 70
+    ? "Tăng giá ổn định 5-8% trong 1-2 năm"
+    : "Giá ổn định, có thể tăng nhẹ 2-4%";
+
+  const midTerm = overallScore >= 70
+    ? "Tăng giá tốt 15-20% trong 3-5 năm nhờ hạ tầng phát triển"
+    : "Tăng giá tương đương lạm phát 10-15% trong 3-5 năm";
+
+  const longTerm = overallScore >= 70
+    ? "Tiềm năng tăng giá 50-80% trong 10 năm nếu khu vực phát triển"
+    : "Tăng giá dài hạn 25-40% theo thị trường chung";
+
+  return {
+    shortTerm,
+    midTerm,
+    longTerm
+  };
 }

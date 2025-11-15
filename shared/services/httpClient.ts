@@ -17,7 +17,7 @@ export interface HttpResponse<T = any> {
 }
 
 export class HttpClient {
-  private defaultHeaders: Record<string, string>;
+  public defaultHeaders: Record<string, string>;
   private defaultTimeout: number;
   private defaultRetries: number;
 

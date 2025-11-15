@@ -390,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
       
-      const results = await searchLocations(query, 10);
+      const results = await suggestLocations(query, { limit: 10 });
       res.json(results);
     } catch (error: any) {
       console.error('Location search error:', error);

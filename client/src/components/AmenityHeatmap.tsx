@@ -61,7 +61,7 @@ export default function AmenityHeatmap({
     }
 
     // Create heatmap data
-    const heatmapData = createHeatmapData(filteredAmenities, radius, intensity);
+    const heatmapData = createHeatmapData(filteredAmenities, radius, intensity) as any;
 
     // Remove existing layers and source
     try {

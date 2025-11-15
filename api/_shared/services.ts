@@ -486,8 +486,8 @@ function sortResultsByRelevance(results: any[], query: string): any[] {
       'country': 0     // Not in priority system
     };
 
-    const aPriority = typePriority[a.type] || 0;
-    const bPriority = typePriority[b.type] || 0;
+    const aPriority = typePriority[a.type as keyof typeof typePriority] || 0;
+    const bPriority = typePriority[b.type as keyof typeof typePriority] || 0;
 
     if (aPriority !== bPriority) return bPriority - aPriority;
 

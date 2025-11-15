@@ -175,8 +175,46 @@ export const COMMON_SCHEMAS = {
   },
 
   propertyAnalysis: {
-    ...COMMON_SCHEMAS.coordinates,
-    ...COMMON_SCHEMAS.radius,
+    coordinates: {
+      required: true,
+      custom: (value: any) => {
+        if (!Array.isArray(value) || value.length === 0) {
+          return 'Coordinates must be a non-empty array';
+        }
+
+        for (const pair of value) {
+          if (!Array.isArray(pair) || pair.length !== 2) {
+            return 'Each coordinate must be a pair [lng, lat]';
+          }
+
+          const [lng, lat] = pair;
+          if (typeof lng !== 'number' || typeof lat !== 'number') {
+            return 'Coordinates must be numbers';
+          }
+
+          if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+            return 'Invalid coordinate range';
+          }
+        }
+
+        return null;
+      }
+    },
+
+    radius: {
+      required: true,
+      custom: (value: any) => {
+        if (typeof value !== 'number' || value <= 0) {
+          return 'Radius must be a positive number';
+        }
+
+        if (value > 10000) {
+          return 'Radius cannot exceed 10km';
+        }
+
+        return null;
+      }
+    },
     categories: {
       required: true,
       custom: (value: any) => {

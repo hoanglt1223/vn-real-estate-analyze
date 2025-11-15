@@ -1,9 +1,10 @@
 // Re-export from shared cache service
-export { cache, generateCacheKey, CACHE_TTL } from '../../shared/services/cache';
+import { cache, generateCacheKey, CACHE_TTL } from '../../shared/services/cache';
+export { cache, generateCacheKey, CACHE_TTL };
 
 // Decorator for caching function results
 export function cached<T extends (...args: any[]) => Promise<any>>(
-  keyGenerator: (...args: Parameters<T>) => string,
+  keyGenerator: (...args: any[]) => string,
   ttl: number = 5 * 60 * 1000
 ) {
   return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {

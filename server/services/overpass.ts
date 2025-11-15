@@ -56,7 +56,7 @@ class LocalMemoryCache {
   cleanup(): void {
     const now = Date.now();
     const keysToDelete: string[] = [];
-    for (const [key, entry] of this.cache.entries()) {
+    for (const [key, entry] of Array.from(this.cache.entries())) {
       if (now - entry.timestamp > entry.ttl) {
         keysToDelete.push(key);
       }
@@ -170,7 +170,7 @@ export async function fetchAmenities(
   const cachedResult = localCache.get(cacheKey);
   if (cachedResult) {
     console.log(`Cache hit for amenities: ${cacheKey}`);
-    return cachedResult;
+    return cachedResult as any[];
   }
 
   console.log(`Cache miss for amenities: ${cacheKey}`);
@@ -189,10 +189,9 @@ export async function fetchAmenities(
       includeSmallShops
     });
 
-    let categoryAmenities = localCache.get(categoryCacheKey);
+    let categoryAmenities = localCache.get(categoryCacheKey) as any[] || [];
 
-    if (!categoryAmenities) {
-      categoryAmenities = [];
+    if (categoryAmenities.length === 0) {
       // Fetch from Overpass API
       try {
         const overpassQuery = buildOverpassQuery(lat, lng, radius, query.tags);

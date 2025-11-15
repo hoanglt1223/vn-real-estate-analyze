@@ -42,7 +42,7 @@ export function optimizeAnalysisResponse(
 
   // Optimize amenities data
   if (opts.includeAmenityDetails && analysisData.amenities) {
-    optimized.amenities = optimizeAmenities(analysisData.amenities, opts.maxAmenities);
+    optimized.amenities = optimizeAmenities(analysisData.amenities, opts.maxAmenities || 100);
     optimized.amenitiesCount = analysisData.amenities.length;
   } else if (analysisData.amenities) {
     optimized.amenitiesCount = analysisData.amenities.length;
@@ -52,7 +52,7 @@ export function optimizeAnalysisResponse(
 
   // Optimize infrastructure data
   if (opts.includeInfrastructureDetails && analysisData.infrastructure) {
-    optimized.infrastructure = optimizeInfrastructure(analysisData.infrastructure, opts.maxInfrastructureItems);
+    optimized.infrastructure = optimizeInfrastructure(analysisData.infrastructure, opts.maxInfrastructureItems || 50);
   } else if (analysisData.infrastructure) {
     optimized.infrastructureSummary = summarizeInfrastructureLocal(analysisData.infrastructure);
   }

@@ -12,7 +12,10 @@ interface PDFData {
   analysisResults: any;
 }
 
-export async function generatePDF(data: PDFData) {
+export async function generatePDF(data: PDFData, options?: {
+  returnAsBlob?: boolean;
+  filename?: string;
+}): Promise<string | Blob> {
   const pdf = new jsPDF('p', 'mm', 'a4');
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -320,10 +323,47 @@ export async function generatePDF(data: PDFData) {
   // Add watermark and footer
   addWatermarkAndFooter(pdf);
 
-  const fileName = `bao-cao-phan-tich-${Date.now()}.pdf`;
-  pdf.save(fileName);
+  const fileName = options?.filename || `bao-cao-phan-tich-${Date.now()}.pdf`;
 
-  return fileName;
+  // Serverless-compatible export options
+  if (options?.returnAsBlob) {
+    // Return as blob for serverless upload or further processing
+    return pdf.output('blob');
+  } else {
+    // Direct download (client-side only - serverless compatible)
+    pdf.save(fileName);
+    return fileName;
+  }
+}
+
+// Serverless-compatible function to generate PDF as base64 for upload
+export async function generatePDFForUpload(data: PDFData, filename?: string): Promise<{
+  data: string; // base64 string
+  filename: string;
+  mimeType: string;
+}> {
+  const result = await generatePDF(data, { returnAsBlob: true, filename });
+
+  // Type guard to ensure we have a Blob
+  if (!(result instanceof Blob)) {
+    throw new Error('PDF generation failed to return a Blob');
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      const actualFilename = filename || `bao-cao-phan-tich-${Date.now()}.pdf`;
+
+      resolve({
+        data: base64String,
+        filename: actualFilename,
+        mimeType: 'application/pdf'
+      });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(result);
+  });
 }
 
 // Helper function to draw score chart
