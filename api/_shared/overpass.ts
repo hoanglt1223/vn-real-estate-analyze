@@ -173,6 +173,15 @@ export async function fetchAmenities(
   categories: string[],
   includeSmallShops: boolean = false
 ): Promise<any[]> {
+  // Enhanced logging for debugging
+  console.log(`fetchAmenities called with:`, {
+    lat,
+    lng,
+    radius,
+    categories,
+    includeSmallShops
+  });
+
   // Generate cache key based on location, radius, categories, and includeSmallShops setting
   const cacheKey = generateCacheKey('amenities', {
     lat: lat.toFixed(4),
@@ -183,10 +192,10 @@ export async function fetchAmenities(
   });
 
   // Try to get from cache first
-  const cachedResult = localCache.get(cacheKey);
+  const cachedResult = localCache.get(cacheKey) as any[];
   if (cachedResult) {
-    console.log(`Cache hit for amenities: ${cacheKey}`);
-    return cachedResult as any[];
+    console.log(`Cache hit for amenities: ${cacheKey}, found ${cachedResult.length} amenities`);
+    return cachedResult;
   }
 
   console.log(`Cache miss for amenities: ${cacheKey}`);
@@ -207,19 +216,26 @@ export async function fetchAmenities(
 
     let categoryAmenities: any[] = localCache.get(categoryCacheKey) as any[];
 
-    if (!categoryAmenities || categoryAmenities.length === 0) {
+    if (!categoryAmenities || (Array.isArray(categoryAmenities) && categoryAmenities.length === 0)) {
       categoryAmenities = [];
       // Fetch from Overpass API
       try {
         const overpassQuery = buildOverpassQuery(lat, lng, radius, query.tags);
+        console.log(`Overpass query for ${category}:`, overpassQuery);
+
         const response = await overpassClient.query(overpassQuery);
 
-        if (!response.data) continue;
+        if (!response.data) {
+          console.log(`No data returned for ${category}`);
+          continue;
+        }
 
         const data = response.data;
         const elements = data.elements || [];
+        console.log(`Found ${elements.length} raw elements for ${category}`);
 
         categoryAmenities = [];
+        let filteredOut = 0;
 
         for (const element of elements) {
           const elementLat = element.lat || element.center?.lat;
@@ -227,7 +243,10 @@ export async function fetchAmenities(
 
           if (!elementLat || !elementLng) continue;
 
-          if (!isNotablePlace(element.tags, category, includeSmallShops)) continue;
+          if (!isNotablePlace(element.tags, category, includeSmallShops)) {
+            filteredOut++;
+            continue;
+          }
 
           const distanceValue = turf.distance(
             point([lng, lat]),
@@ -251,6 +270,8 @@ export async function fetchAmenities(
           });
         }
 
+        console.log(`After filtering ${category}: ${categoryAmenities.length} amenities kept, ${filteredOut} filtered out`);
+
         // Cache individual category results for longer TTL since amenities change slowly
         localCache.set(categoryCacheKey, categoryAmenities, CACHE_TTL.AMENITIES);
 
@@ -264,6 +285,8 @@ export async function fetchAmenities(
   }
 
   const sortedAmenities = allAmenities.sort((a, b) => a.distance - b.distance);
+
+  console.log(`Total amenities found across all categories: ${sortedAmenities.length}`);
 
   // Cache the combined result
   localCache.set(cacheKey, sortedAmenities, CACHE_TTL.AMENITIES);
@@ -444,23 +467,30 @@ function isNotablePlace(tags: any, category: string, includeSmallShops: boolean 
     if (tags.aeroway === 'aerodrome') return true;
     if (tags.railway === 'station') return true;
     if (tags.amenity === 'bus_station') return true;
-    if (tags.highway === 'bus_stop') return true; // Remove name requirement
+    if (tags.highway === 'bus_stop') return true;
+    if (tags.railway === 'tram_stop') return true;
+    if (tags.amenity === 'taxi') return true;
   }
 
-  // Shopping - include major retailers
+  // Shopping - include more shops without requiring names
   if (category === 'shopping') {
     if (tags.shop === 'mall' || tags.shop === 'supermarket' || tags.shop === 'department_store') return true;
-    if (tags.amenity === 'bank' || tags.amenity === 'atm') return true;
+    if (tags.shop === 'convenience' || tags.shop === 'bakery' || tags.shop === 'butcher' || tags.shop === 'greengrocer') return true;
+    if (tags.shop === 'beverages' || tags.shop === 'electronics' || tags.shop === 'mobile_phone') return true;
+    if (tags.shop === 'furniture' || tags.shop === 'clothing' || tags.shop === 'shoes') return true;
+    if (tags.amenity === 'bank' || tags.amenity === 'atm' || tags.amenity === 'post_office') return true;
     if (includeSmallShops && tags.shop) return true;
   }
 
-  // Entertainment and food
+  // Entertainment and food - include more entertainment venues
   if (category === 'entertainment') {
     if (tags.amenity === 'cinema' || tags.amenity === 'theatre' ||
         tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food') return true;
+    if (tags.amenity === 'food_court' || tags.amenity === 'bar' || tags.amenity === 'pub') return true;
     if (tags.leisure === 'stadium' || tags.leisure === 'sports_centre' || tags.leisure === 'fitness_centre') return true;
     if (tags.leisure === 'park' || tags.leisure === 'garden') return true;
     if (tags.tourism === 'hotel' || tags.tourism === 'museum' || tags.tourism === 'gallery') return true;
+    if (tags.tourism === 'artwork') return true;
   }
 
   return false;

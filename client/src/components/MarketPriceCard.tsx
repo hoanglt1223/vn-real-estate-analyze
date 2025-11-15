@@ -62,22 +62,22 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="space-y-1 min-w-0">
             <p className="text-xs text-muted-foreground">Thấp nhất</p>
-            <p className="text-lg font-bold break-words" data-testid="text-price-min">
+            <p className="text-sm sm:text-lg font-bold break-words" data-testid="text-price-min">
               {formatPrice(data.min)}
             </p>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0">
             <p className="text-xs text-muted-foreground">Trung bình</p>
-            <p className="text-lg font-bold text-primary break-words" data-testid="text-price-avg">
+            <p className="text-sm sm:text-lg font-bold text-primary break-words" data-testid="text-price-avg">
               {formatPrice(data.avg)}
             </p>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0">
             <p className="text-xs text-muted-foreground">Cao nhất</p>
-            <p className="text-lg font-bold break-words" data-testid="text-price-max">
+            <p className="text-sm sm:text-lg font-bold break-words" data-testid="text-price-max">
               {formatPrice(data.max)}
             </p>
           </div>
@@ -94,12 +94,26 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
           </div>
         )}
 
-        <div className="h-32 sm:h-40 md:h-48">
+        <div className="h-28 sm:h-32 md:h-40 min-h-[112px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <XAxis dataKey="name" fontSize={10} tick={{ fontSize: 10 }} />
-              <YAxis fontSize={10} tickFormatter={(value) => formatPrice(value)} />
-              <Tooltip formatter={(value) => formatPrice(value as number)} />
+            <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+              <XAxis
+                dataKey="name"
+                fontSize={9}
+                tick={{ fontSize: 9 }}
+                angle={-45}
+                textAnchor="end"
+                height={40}
+              />
+              <YAxis
+                fontSize={9}
+                tickFormatter={(value) => formatPrice(value)}
+                width={60}
+              />
+              <Tooltip
+                formatter={(value) => formatPrice(value as number)}
+                contentStyle={{ fontSize: '12px' }}
+              />
               <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -119,23 +133,27 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
         {data.sources && data.sources.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-xs font-semibold mb-2">Nguồn dữ liệu:</p>
-            <div className="space-y-1">
+            <div className="space-y-2 max-h-32 overflow-y-auto">
               {data.sources.map((source, idx) => (
-                <div key={idx} className="text-xs text-muted-foreground flex items-start justify-between gap-1">
-                  <div className="flex items-center gap-1 flex-wrap min-w-0">
-                    <span className="truncate">• {source.name}</span>
-                    {source.type && (
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 flex-shrink-0">
-                        {source.type === 'real_estate_portal' ? 'Portal' :
-                         source.type === 'marketplace' ? 'Market' :
-                         source.type === 'estimated' ? 'Ước tính' : source.type}
+                <div key={idx} className="text-xs text-muted-foreground space-y-1">
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="truncate font-medium">• {source.name}</span>
+                    </div>
+                    {source.listingCount && (
+                      <Badge variant="secondary" className="text-xs flex-shrink-0">
+                        {source.listingCount}
                       </Badge>
                     )}
                   </div>
-                  {source.listingCount && (
-                    <Badge variant="secondary" className="text-xs flex-shrink-0">
-                      {source.listingCount} tin
-                    </Badge>
+                  {source.type && (
+                    <div className="ml-4">
+                      <Badge variant="outline" className="text-[10px] px-2 py-0">
+                        {source.type === 'real_estate_portal' ? 'BĐS Portal' :
+                         source.type === 'marketplace' ? 'Marketplace' :
+                         source.type === 'estimated' ? 'Ước tính' : source.type}
+                      </Badge>
+                    </div>
                   )}
                 </div>
               ))}

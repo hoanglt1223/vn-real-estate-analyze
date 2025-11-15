@@ -16,11 +16,22 @@ export async function generatePDF(data: PDFData, options?: {
   returnAsBlob?: boolean;
   filename?: string;
 }): Promise<string | Blob> {
+  // Input validation
+  if (!data || !data.propertyData) {
+    throw new Error('Invalid PDF data: propertyData is required');
+  }
+
+  if (!data.propertyData.center || typeof data.propertyData.center.lat !== 'number' || typeof data.propertyData.center.lng !== 'number') {
+    throw new Error('Invalid property center coordinates');
+  }
+
   const pdf = new jsPDF('p', 'mm', 'a4');
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 15;
   let yPos = margin;
+
+  try {
 
   // Add header with better formatting
   pdf.setFont('helvetica', 'bold');
@@ -63,44 +74,119 @@ export async function generatePDF(data: PDFData, options?: {
       pdf.text('BẢN ĐỒ VỊ TRÍ VÀ TIỆN ÍCH', margin, yPos);
       yPos += 8;
 
-      // Enhanced map capture with better quality
-      const canvas = await html2canvas(mapElement, {
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        scale: 2, // Higher resolution
-        logging: false,
-        width: mapElement.offsetWidth,
-        height: mapElement.offsetHeight
-      });
+      let mapCaptureSuccessful = false;
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.9);
-      const imgWidth = pageWidth - (2 * margin);
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      try {
+        // Enhanced map capture with better quality and CORS handling
+        const canvas = await html2canvas(mapElement, {
+          useCORS: true,
+          allowTaint: false, // Changed to false for better CORS handling
+          backgroundColor: '#ffffff',
+          scale: 1.5, // Reduced scale to prevent memory issues
+          logging: false,
+          width: mapElement.offsetWidth,
+          height: mapElement.offsetHeight,
+          onclone: (clonedDoc) => {
+            // Remove any potentially problematic elements
+            const clonedMap = clonedDoc.querySelector('[data-testid="map-container"]');
+            if (clonedMap) {
+              // Remove any video or canvas elements that might cause issues
+              const videos = clonedMap.querySelectorAll('video');
+              const canvases = clonedMap.querySelectorAll('canvas');
+              videos.forEach(v => v.remove());
+              canvases.forEach(c => c.remove());
+            }
+          }
+        });
 
-      if (yPos + imgHeight > pageHeight - margin) {
-        pdf.addPage();
-        yPos = margin;
+        const imgData = canvas.toDataURL('image/jpeg', 0.8);
+        const imgWidth = pageWidth - (2 * margin);
+        const imgHeight = Math.min((canvas.height * imgWidth) / canvas.width, pageHeight * 0.4); // Limit height
+
+        if (yPos + imgHeight > pageHeight - margin) {
+          pdf.addPage();
+          yPos = margin;
+        }
+
+        // Add border around map image
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setLineWidth(0.5);
+        pdf.rect(margin - 1, yPos - 1, imgWidth + 2, imgHeight + 2);
+
+        pdf.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
+        yPos += imgHeight + 15;
+        mapCaptureSuccessful = true;
+
+      } catch (mapError) {
+        console.warn('Primary map capture failed, trying alternative method:', mapError);
+
+        // Fallback: Try with html-to-image library
+        try {
+          const dataUrl = await toPng(mapElement, {
+            quality: 0.8,
+            width: mapElement.offsetWidth,
+            height: mapElement.offsetHeight,
+            style: {
+              transform: 'scale(1)',
+              transformOrigin: 'top left'
+            }
+          });
+
+          const img = new Image();
+          img.src = dataUrl;
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+
+          const imgWidth = pageWidth - (2 * margin);
+          const imgHeight = Math.min((img.height * imgWidth) / img.width, pageHeight * 0.4);
+
+          if (yPos + imgHeight > pageHeight - margin) {
+            pdf.addPage();
+            yPos = margin;
+          }
+
+          pdf.setDrawColor(200, 200, 200);
+          pdf.setLineWidth(0.5);
+          pdf.rect(margin - 1, yPos - 1, imgWidth + 2, imgHeight + 2);
+
+          pdf.addImage(dataUrl, 'PNG', margin, yPos, imgWidth, imgHeight);
+          yPos += imgHeight + 15;
+          mapCaptureSuccessful = true;
+
+        } catch (fallbackError) {
+          console.error('All map capture methods failed:', fallbackError);
+        }
       }
 
-      // Add border around map image
-      pdf.setDrawColor(200, 200, 200);
-      pdf.setLineWidth(0.5);
-      pdf.rect(margin - 1, yPos - 1, imgWidth + 2, imgHeight + 2);
-
-      pdf.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
-      yPos += imgHeight + 15;
-
-      // Add map legend
-      pdf.setFont('helvetica', 'italic');
-      pdf.setFontSize(9);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('Bản đồ hiển thị vị trí khu đất và các tiện ích xung quanh', margin, yPos);
-      pdf.setTextColor(0, 0, 0);
-      yPos += 8;
+      if (mapCaptureSuccessful) {
+        // Add map legend
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(9);
+        pdf.setTextColor(100, 100, 100);
+        pdf.text('Bản đồ hiển thị vị trí khu đất và các tiện ích xung quanh', margin, yPos);
+        pdf.setTextColor(0, 0, 0);
+        yPos += 8;
+      } else {
+        // Add fallback text if map capture failed
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(10);
+        pdf.setTextColor(150, 150, 150);
+        pdf.text('Không thể chụp bản đồ. Vui lòng kiểm tra kết nối và thử lại.', margin, yPos);
+        pdf.setTextColor(0, 0, 0);
+        yPos += 10;
+      }
     }
   } catch (error) {
-    console.error('Error capturing map:', error);
+    console.error('Error in map section:', error);
+    // Add error message to PDF
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('Đã xảy ra lỗi khi xử lý bản đồ. Báo cáo vẫn sẽ được tạo với các thông tin khác.', margin, yPos);
+    pdf.setTextColor(0, 0, 0);
+    yPos += 10;
   }
 
   if (yPos > pageHeight - 40) {
@@ -325,14 +411,48 @@ export async function generatePDF(data: PDFData, options?: {
 
   const fileName = options?.filename || `bao-cao-phan-tich-${Date.now()}.pdf`;
 
-  // Serverless-compatible export options
-  if (options?.returnAsBlob) {
-    // Return as blob for serverless upload or further processing
-    return pdf.output('blob');
-  } else {
-    // Direct download (client-side only - serverless compatible)
-    pdf.save(fileName);
-    return fileName;
+    // Serverless-compatible export options
+    if (options?.returnAsBlob) {
+      // Return as blob for serverless upload or further processing
+      return pdf.output('blob');
+    } else {
+      // Direct download (client-side only - serverless compatible)
+      pdf.save(fileName);
+      return fileName;
+    }
+  } catch (pdfError) {
+    console.error('Error during PDF generation:', pdfError);
+
+    // Create a simple fallback PDF
+    try {
+      const fallbackPdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = fallbackPdf.internal.pageSize.getWidth();
+      const margin = 15;
+
+      fallbackPdf.setFont('helvetica', 'bold');
+      fallbackPdf.setFontSize(20);
+      fallbackPdf.text('BÁO CÁO PHÂN TÍCH BẤT ĐỘNG SẢN', pageWidth / 2, 30, { align: 'center' });
+
+      fallbackPdf.setFont('helvetica', 'normal');
+      fallbackPdf.setFontSize(12);
+      fallbackPdf.text(`Ngày tạo: ${new Date().toLocaleDateString('vi-VN')}`, pageWidth / 2, 40, { align: 'center' });
+
+      fallbackPdf.setFont('helvetica', 'italic');
+      fallbackPdf.setFontSize(10);
+      fallbackPdf.text('Đã xảy ra lỗi khi tạo báo cáo đầy đủ. Vui lòng thử lại.', pageWidth / 2, 60, { align: 'center' });
+
+      const fallbackFileName = options?.filename || `bao-cao-phan-tich-loi-${Date.now()}.pdf`;
+
+      if (options?.returnAsBlob) {
+        return fallbackPdf.output('blob');
+      } else {
+        fallbackPdf.save(fallbackFileName);
+        return fallbackFileName;
+      }
+    } catch (fallbackError) {
+      console.error('Even fallback PDF generation failed:', fallbackError);
+      throw new Error(`PDF generation failed: ${pdfError instanceof Error ? pdfError.message : String(pdfError)}`);
+    }
   }
 }
 

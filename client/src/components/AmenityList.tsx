@@ -291,7 +291,7 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[60vh] max-h-[400px] min-h-[300px] pr-2 sm:pr-4">
+        <ScrollArea className="h-[50vh] max-h-[500px] min-h-[350px] pr-2 sm:pr-4">
           <div className="space-y-4 sm:space-y-6">
             {Object.entries(groupedAmenities).map(([category, items]) => (
               <div key={category} className="space-y-3">

@@ -393,9 +393,36 @@ export default function MapView({
     // Add error handling for geolocation
     geolocateControl.on('error', (e: any) => {
       console.error('Geolocation error:', e);
+
+      // Provide user-friendly error messages
+      let errorMessage = 'Không thể xác định vị trí của bạn. ';
+
+      if (e.code === 1) { // PERMISSION_DENIED
+        errorMessage += 'Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt.';
+      } else if (e.code === 2) { // POSITION_UNAVAILABLE
+        errorMessage += 'Không thể nhận tín hiệu vị trí. Vui lòng thử lại ở khu vực có tín hiệu tốt hơn.';
+      } else if (e.code === 3) { // TIMEOUT
+        errorMessage += 'Quá thời gian chờ. Vui lòng thử lại.';
+      } else {
+        errorMessage += `Lỗi không xác định (${e.code}). Vui lòng thử lại.`;
+      }
+
+      // Show user-friendly toast or alert
+      if ((window as any).toast) {
+        (window as any).toast({
+          title: 'Lỗi định vị',
+          description: errorMessage,
+          variant: 'destructive',
+          duration: 5000
+        });
+      } else {
+        // Fallback to console
+        console.warn(errorMessage);
+      }
+
       // On macOS, sometimes permissions need to be explicitly requested
       if (navigator.platform && navigator.platform.includes('Mac')) {
-        console.log('macOS detected - you may need to enable location services in System Preferences');
+        console.log('macOS detected - you may need to enable location services in System Preferences > Security & Privacy > Location Services');
       }
     });
 
