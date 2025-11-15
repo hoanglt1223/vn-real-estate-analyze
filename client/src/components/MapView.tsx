@@ -212,10 +212,10 @@ export default function MapView({
         duration: 1500
       });
 
-      // Tạo circle bán kính 10m xung quanh điểm được chọn
+      // Tạo circle bán kính 5m xung quanh điểm được chọn
       const centerPoint = safeCreatePoint(lng, lat);
       const options = { steps: 32, units: 'meters' as const };
-      const circlePolygon = circle(centerPoint, 10, options); // 10m bán kính
+      const circlePolygon = circle(centerPoint, 5, options); // 5m bán kính
 
       const polygonCoords = circlePolygon.geometry.coordinates[0];
 
@@ -310,10 +310,10 @@ export default function MapView({
               duration: 1500
             });
 
-            // Create 10m radius circle around user location
+            // Create 5m radius circle around user location
             const centerPoint = safeCreatePoint(longitude, latitude);
             const options = { steps: 32, units: 'meters' as const };
-            const circlePolygon = circle(centerPoint, 10, options); // 10m radius
+            const circlePolygon = circle(centerPoint, 5, options); // 5m radius
 
             const polygonCoords = circlePolygon.geometry.coordinates[0];
 
@@ -793,10 +793,10 @@ export default function MapView({
               duration: 1500
             });
 
-            // Create 10m radius circle around user location
+            // Create 5m radius circle around user location
             const centerPoint = safeCreatePoint(longitude, latitude);
             const options = { steps: 32, units: 'meters' as const };
-            const circlePolygon = circle(centerPoint, 10, options); // 10m radius
+            const circlePolygon = circle(centerPoint, 5, options); // 5m radius
 
             const polygonCoords = circlePolygon.geometry.coordinates[0];
 
