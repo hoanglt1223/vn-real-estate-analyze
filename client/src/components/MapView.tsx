@@ -143,6 +143,9 @@ export default function MapView({
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const radiusSourceRef = useRef<string>('radius-circle');
   const [currentCenter, setCurrentCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const lastUpdateRef = useRef<number>(0);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const renderQualityRef = useRef<'high' | 'medium' | 'low'>('high');
 
   function getOrientation(bearing: number): string {
     const normalized = ((bearing + 360) % 360);
@@ -184,6 +187,34 @@ export default function MapView({
       )
     );
   }
+
+  // Performance throttling function
+  const throttledUpdate = (callback: () => void, delay: number = 300) => {
+    const now = Date.now();
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    if (now - lastUpdateRef.current > delay) {
+      callback();
+      lastUpdateRef.current = now;
+    } else {
+      updateTimeoutRef.current = setTimeout(() => {
+        callback();
+        lastUpdateRef.current = Date.now();
+      }, delay);
+    }
+  };
+
+  // Determine render quality based on zoom and device performance
+  const getRenderQuality = (): 'high' | 'medium' | 'low' => {
+    const zoom = map.current?.getZoom() || 12;
+    const isLowEndDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
+
+    if (zoom < 10 || isLowEndDevice) return 'low';
+    if (zoom < 14) return 'medium';
+    return 'high';
+  };
 
   // Helper function to safely create a point with error handling
   function safeCreatePoint(lng: number, lat: number) {
@@ -303,6 +334,14 @@ export default function MapView({
       style: 'mapbox://styles/mapbox/streets-v12',
       center,
       zoom,
+      // Performance optimizations
+      antialias: false,
+      fadeDuration: 0,
+      optimizeForTerrain: false,
+      pitchWithRotate: false,
+      renderWorldCopies: false,
+      maxTileCacheSize: 10, // Reduced from default (depends on device)
+      localIdeographFontFamily: false, // Disable local fonts for better performance
     });
 
     draw.current = new MapboxDraw({
@@ -522,6 +561,18 @@ export default function MapView({
     map.current.on('load', () => {
       setIsLoaded(true);
       addRadiusLayers();
+
+      // Set initial render quality
+      renderQualityRef.current = getRenderQuality();
+
+      // Monitor zoom level for performance adjustments
+      map.current?.on('zoom', () => {
+        const newQuality = getRenderQuality();
+        if (newQuality !== renderQualityRef.current) {
+          renderQualityRef.current = newQuality;
+          console.log(`Render quality changed to: ${newQuality}`);
+        }
+      });
     });
 
     map.current.on('style.load', () => {
@@ -596,8 +647,20 @@ export default function MapView({
     }
 
     return () => {
+      // Cleanup timeout
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+
+      // Cleanup markers
       markersRef.current.forEach(marker => marker.remove());
-      map.current?.remove();
+      markersRef.current = [];
+
+      // Cleanup map
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
     };
   }, []);
 

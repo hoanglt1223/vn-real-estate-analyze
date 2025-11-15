@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 
 interface Amenity {
@@ -32,6 +32,16 @@ export default function AmenityHeatmap({
 }: HeatmapProps) {
   const heatmapLayerId = 'amenity-heatmap';
   const sourceId = 'amenity-heatmap-source';
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUpdateRef = useRef<number>(0);
+
+  // Memoize filtered amenities to prevent unnecessary recalculations
+  const filteredAmenities = useMemo(() => {
+    if (!visible) return [];
+    return amenities.filter(amenity =>
+      selectedCategories.length === 0 || selectedCategories.includes(amenity.category)
+    );
+  }, [amenities, selectedCategories, visible]);
 
   useEffect(() => {
     if (!map || !visible) {
@@ -51,114 +61,152 @@ export default function AmenityHeatmap({
       return;
     }
 
-    // Filter amenities by selected categories
-    const filteredAmenities = amenities.filter(amenity =>
-      selectedCategories.length === 0 || selectedCategories.includes(amenity.category)
-    );
+    // Performance optimization: Limit amenities for heatmap
+    const maxAmenities = map.getZoom() < 12 ? 100 : 500;
+    const limitedAmenities = filteredAmenities.slice(0, maxAmenities);
 
-    if (filteredAmenities.length === 0) {
+    if (limitedAmenities.length === 0) {
+      // Clear existing heatmap when no amenities
+      try {
+        if (map.getLayer(heatmapLayerId)) {
+          map.removeLayer(heatmapLayerId);
+        }
+        if (map.getSource(sourceId)) {
+          map.removeSource(sourceId);
+        }
+      } catch (e) {
+        console.warn('Error clearing heatmap:', e);
+      }
       return;
     }
 
-    // Create heatmap data
-    const heatmapData = createHeatmapData(filteredAmenities, radius, intensity) as any;
+      // Throttled heatmap update
+    const updateHeatmap = () => {
+      // Create optimized heatmap data with fewer surrounding points
+      const heatmapData = createOptimizedHeatmapData(limitedAmenities, radius, intensity) as any;
 
-    // Remove existing layers and source
-    try {
-      if (map.getLayer(heatmapLayerId)) {
-        map.removeLayer(heatmapLayerId);
+      // Remove existing layers and source
+      try {
+        if (map.getLayer(heatmapLayerId)) {
+          map.removeLayer(heatmapLayerId);
+        }
+        if (map.getSource(sourceId)) {
+          map.removeSource(sourceId);
+        }
+      } catch (e) {
+        console.warn('Error removing existing heatmap:', e);
       }
-      if (map.getSource(sourceId)) {
-        map.removeSource(sourceId);
-      }
-    } catch (e) {
-      console.warn('Error removing existing heatmap:', e);
+
+      // Add source
+      map.addSource(sourceId, {
+        type: 'geojson',
+        data: heatmapData
+      });
+
+      // Add optimized heatmap layer
+      map.addLayer({
+        id: heatmapLayerId,
+        type: 'heatmap',
+        source: sourceId,
+        paint: {
+          // Increase the heatmap weight based on frequency
+          'heatmap-weight': [
+            'interpolate',
+            ['linear'],
+            ['get', 'weight'],
+            0,
+            0,
+            6,
+            1
+          ],
+          // Increase the heatmap color intensity
+          'heatmap-intensity': intensity,
+          // Color ramp for heatmap. Domain is 0 (low) to 1 (high).
+          // Begin color ramp at 0-stop with a 0-transparancy color.
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0,
+            'rgba(33,102,172,0)',
+            0.2,
+            'rgb(103,169,207)',
+            0.4,
+            'rgb(209,229,240)',
+            0.6,
+            'rgb(253,219,199)',
+            0.8,
+            'rgb(239,138,98)',
+            1,
+            'rgb(178,24,43)'
+          ],
+          // Adjust the heatmap radius by zoom level (optimized)
+          'heatmap-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0,
+            3,  // Reduced from 5
+            15,
+            20  // Reduced from 30
+          ],
+          // Transition from heatmap to circle layer by zoom level
+          'heatmap-opacity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            7,
+            1,
+            15,
+            0.3
+          ]
+        }
+      }, 'waterway-label'); // Insert before waterway labels
+
+      // Add hover effect
+      map.on('mouseenter', heatmapLayerId, () => {
+        map.getCanvas().style.cursor = 'crosshair';
+      });
+
+      map.on('mouseleave', heatmapLayerId, () => {
+        map.getCanvas().style.cursor = '';
+      });
+    };
+
+    // Throttling mechanism
+    const now = Date.now();
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
     }
 
-    // Add source
-    map.addSource(sourceId, {
-      type: 'geojson',
-      data: heatmapData
-    });
+    const delay = map.getZoom() < 12 ? 600 : 300; // Longer delay at lower zoom
 
-    // Add heatmap layer
-    map.addLayer({
-      id: heatmapLayerId,
-      type: 'heatmap',
-      source: sourceId,
-      paint: {
-        // Increase the heatmap weight based on frequency
-        'heatmap-weight': [
-          'interpolate',
-          ['linear'],
-          ['get', 'weight'],
-          0,
-          0,
-          6,
-          1
-        ],
-        // Increase the heatmap color intensity
-        'heatmap-intensity': intensity,
-        // Color ramp for heatmap. Domain is 0 (low) to 1 (high).
-        // Begin color ramp at 0-stop with a 0-transparancy color.
-        'heatmap-color': [
-          'interpolate',
-          ['linear'],
-          ['heatmap-density'],
-          0,
-          'rgba(33,102,172,0)',
-          0.2,
-          'rgb(103,169,207)',
-          0.4,
-          'rgb(209,229,240)',
-          0.6,
-          'rgb(253,219,199)',
-          0.8,
-          'rgb(239,138,98)',
-          1,
-          'rgb(178,24,43)'
-        ],
-        // Adjust the heatmap radius by zoom level
-        'heatmap-radius': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          0,
-          5,
-          15,
-          30
-        ],
-        // Transition from heatmap to circle layer by zoom level
-        'heatmap-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          7,
-          1,
-          15,
-          0.3
-        ]
+    if (now - lastUpdateRef.current > delay) {
+      updateHeatmap();
+      lastUpdateRef.current = now;
+    } else {
+      updateTimeoutRef.current = setTimeout(() => {
+        updateHeatmap();
+        lastUpdateRef.current = Date.now();
+      }, delay);
+    }
+
+    // Cleanup function
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
       }
-    }, 'waterway-label'); // Insert before waterway labels
+    };
 
-    // Add hover effect
-    map.on('mouseenter', heatmapLayerId, () => {
-      map.getCanvas().style.cursor = 'crosshair';
-    });
-
-    map.on('mouseleave', heatmapLayerId, () => {
-      map.getCanvas().style.cursor = '';
-    });
-
-  }, [map, amenities, selectedCategories, radius, intensity, visible]);
+  }, [map, filteredAmenities, radius, intensity, visible]);
 
   return null;
 }
 
-function createHeatmapData(amenities: Amenity[], radius: number, intensity: number) {
-  // Create a grid of weighted points for heatmap
+function createOptimizedHeatmapData(amenities: Amenity[], radius: number, intensity: number) {
+  // Create optimized weighted points for heatmap with fewer surrounding points
   const features: any[] = [];
-  const gridSize = radius / 2; // Half the radius for grid density
+  const gridSize = radius / 4; // Reduced grid size for better performance
 
   amenities.forEach(amenity => {
     // Add the main point with full weight
@@ -175,11 +223,11 @@ function createHeatmapData(amenities: Amenity[], radius: number, intensity: numb
       }
     });
 
-    // Add surrounding points with decreasing weight for smoother gradient
-    const numSurrounding = 4;
+    // Add fewer surrounding points for better performance (reduced from 4 to 2)
+    const numSurrounding = 2; // Reduced for performance
     for (let i = 0; i < numSurrounding; i++) {
       const angle = (i / numSurrounding) * 2 * Math.PI;
-      const distance = gridSize / 2; // Half grid spacing
+      const distance = gridSize / 3; // Reduced distance
 
       // Convert lat/lng to approximate offset
       const latOffset = (distance / 111320) * Math.cos(angle);
@@ -192,7 +240,7 @@ function createHeatmapData(amenities: Amenity[], radius: number, intensity: numb
           coordinates: [amenity.lng + lngOffset, amenity.lat + latOffset]
         },
         properties: {
-          weight: 0.5 * intensity,
+          weight: 0.3 * intensity, // Reduced weight for performance
           category: amenity.category,
           name: amenity.name
         }

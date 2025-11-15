@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import * as supercluster from 'supercluster';
 
@@ -57,15 +57,41 @@ export default function MarkerCluster({
   const clusterLayerId = 'cluster-layer';
   const clusterCountLayerId = 'cluster-count-layer';
   const unclusteredLayerId = 'unclustered-layer';
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUpdateRef = useRef<number>(0);
+
+  // Memoize filtered amenities to prevent unnecessary recalculations
+  const filteredAmenities = useMemo(() => {
+    return amenities.filter(amenity =>
+      selectedCategories.length === 0 || selectedCategories.includes(amenity.category)
+    );
+  }, [amenities, selectedCategories]);
 
   // Initialize or update cluster
   useEffect(() => {
     if (!map) return;
 
-    // Filter amenities by selected categories
-    const filteredAmenities = amenities.filter(amenity =>
-      selectedCategories.length === 0 || selectedCategories.includes(amenity.category)
-    );
+    // Performance optimization: Only update if there are actual changes
+    if (filteredAmenities.length === 0) {
+      // Clear existing layers when no amenities
+      try {
+        if (map.getLayer(clusterLayerId)) {
+          map.removeLayer(clusterLayerId);
+        }
+        if (map.getLayer(clusterCountLayerId)) {
+          map.removeLayer(clusterCountLayerId);
+        }
+        if (map.getLayer(unclusteredLayerId)) {
+          map.removeLayer(unclusteredLayerId);
+        }
+        if (map.getSource(sourceId)) {
+          map.removeSource(sourceId);
+        }
+      } catch (e) {
+        console.warn('Error clearing cluster layers:', e);
+      }
+      return;
+    }
 
     // Convert to GeoJSON format
     const geojsonPoints = {
@@ -83,11 +109,16 @@ export default function MarkerCluster({
       }))
     };
 
-    // Initialize supercluster
+    // Initialize supercluster with performance optimizations
+    const zoom = map.getZoom();
+    const clusterRadius = zoom < 12 ? 75 : zoom < 15 ? 50 : 25; // Adaptive radius
+
     clusterRef.current = new supercluster.default({
-      radius: 50,
+      radius: clusterRadius,
       maxZoom: 16,
-      minPoints: 2
+      minPoints: 2,
+      extent: 512, // Increased for better performance
+      nodeSize: 64  // Optimized node size
     });
 
     clusterRef.current.load(geojsonPoints.features);
@@ -95,7 +126,7 @@ export default function MarkerCluster({
     // Get map bounds for current zoom
     const bounds = map.getBounds();
     if (!bounds) return;
-    const zoom = Math.floor(map.getZoom());
+    const currentZoom = Math.floor(zoom);
 
     // Get clusters within current view
     const clusters = clusterRef.current.getClusters(
@@ -105,12 +136,12 @@ export default function MarkerCluster({
         bounds.getEast(),
         bounds.getNorth()
       ],
-      zoom
+      currentZoom
     );
 
     updateClusterSource(clusters);
 
-  }, [map, amenities, selectedCategories]);
+  }, [map, filteredAmenities, categoryColors]);
 
   const updateClusterSource = (clusters: any[]) => {
     if (!map) return;
@@ -264,7 +295,26 @@ export default function MarkerCluster({
       map.getCanvas().style.cursor = '';
     });
 
-    // Update on zoom/pan
+    // Throttled update function for better performance
+    const throttledUpdateClusters = () => {
+      const now = Date.now();
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+
+      const delay = map.getZoom() < 12 ? 500 : 200; // Longer delay at lower zoom
+
+      if (now - lastUpdateRef.current > delay) {
+        updateClusters();
+        lastUpdateRef.current = now;
+      } else {
+        updateTimeoutRef.current = setTimeout(() => {
+          updateClusters();
+          lastUpdateRef.current = Date.now();
+        }, delay);
+      }
+    };
+
     const updateClusters = () => {
       if (!map || !clusterRef.current) return;
 
@@ -285,8 +335,19 @@ export default function MarkerCluster({
       updateClusterSource(clusters);
     };
 
-    map.on('moveend', updateClusters);
-    map.on('zoomend', updateClusters);
+    map.on('moveend', throttledUpdateClusters);
+    map.on('zoomend', throttledUpdateClusters);
+
+    // Cleanup function
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+
+      // Remove event listeners
+      map.off('moveend', throttledUpdateClusters);
+      map.off('zoomend', throttledUpdateClusters);
+    };
   };
 
   const expandCluster = (leaves: any[]) => {
