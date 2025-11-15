@@ -222,13 +222,82 @@ export default function MapView({
     map.current.addControl(draw.current);
     map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
     map.current.addControl(new mapboxgl.FullscreenControl(), 'bottom-right');
-    map.current.addControl(new mapboxgl.GeolocateControl({
+    const geolocateControl = new mapboxgl.GeolocateControl({
       positionOptions: {
-        enableHighAccuracy: true
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
       },
       trackUserLocation: true,
       showUserHeading: true
-    }), 'bottom-right');
+    });
+
+    map.current.addControl(geolocateControl, 'bottom-right');
+
+    // Add event listener for when user location is found
+    geolocateControl.on('geolocate', (e: any) => {
+      console.log('Geolocate event:', e);
+      if (e.coords) {
+        const { latitude, longitude } = e.coords;
+        console.log('Location found:', latitude, longitude);
+
+        // Auto-create 10m radius area around user's location
+        if (draw.current && map.current) {
+          // Center map on user location with appropriate zoom
+          map.current.flyTo({
+            center: [longitude, latitude],
+            zoom: 18,
+            duration: 1500
+          });
+
+          // Create 10m radius circle around user location
+          const centerPoint = point([longitude, latitude]);
+          const options = { steps: 32, units: 'meters' as const };
+          const circlePolygon = circle(centerPoint, 10, options); // 10m radius
+
+          const polygonCoords = circlePolygon.geometry.coordinates[0];
+
+          draw.current.deleteAll();
+          const feature = {
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [polygonCoords]
+            },
+            properties: {},
+            id: undefined
+          };
+          draw.current.add(feature as any);
+
+          const turfPolygon = polygon([polygonCoords]);
+          const areaValue = area(turfPolygon);
+          const bearingValue = bearing(
+            point(polygonCoords[0]),
+            point(polygonCoords[1])
+          );
+          const orientation = getOrientation(bearingValue);
+
+          setCurrentCenter({ lat: latitude, lng: longitude });
+
+          onPolygonChange?.({
+            coordinates: polygonCoords,
+            area: Math.round(areaValue),
+            orientation,
+            frontageCount: 4,
+            center: { lat: latitude, lng: longitude }
+          });
+        }
+      }
+    });
+
+    // Add error handling for geolocation
+    geolocateControl.on('error', (e: any) => {
+      console.error('Geolocation error:', e);
+      // On macOS, sometimes permissions need to be explicitly requested
+      if (navigator.platform && navigator.platform.includes('Mac')) {
+        console.log('macOS detected - you may need to enable location services in System Preferences');
+      }
+    });
 
     const layerControl = document.createElement('div');
     layerControl.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
@@ -602,18 +671,126 @@ export default function MapView({
     });
   }, [amenities, selectedCategories, isLoaded, styleLoaded]);
 
+  const handleFindMyLocation = () => {
+    if (!map.current || !draw.current) return;
+
+    // Fallback geolocation implementation for macOS
+    if (!navigator.geolocation) {
+      alert('Trình duyệt của bạn không hỗ trợ định vị vị trí');
+      return;
+    }
+
+    // Check if we have permission
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      if (result.state === 'denied') {
+        alert('Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt');
+        return;
+      }
+
+      // Request current position
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log('Fallback location found:', latitude, longitude);
+
+          // Center map on user location
+          map.current!.flyTo({
+            center: [longitude, latitude],
+            zoom: 18,
+            duration: 1500
+          });
+
+          // Create 10m radius circle around user location
+          const centerPoint = point([longitude, latitude]);
+          const options = { steps: 32, units: 'meters' as const };
+          const circlePolygon = circle(centerPoint, 10, options); // 10m radius
+
+          const polygonCoords = circlePolygon.geometry.coordinates[0];
+
+          draw.current!.deleteAll();
+          const feature = {
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [polygonCoords]
+            },
+            properties: {},
+            id: undefined
+          };
+          draw.current!.add(feature as any);
+
+          const turfPolygon = polygon([polygonCoords]);
+          const areaValue = area(turfPolygon);
+          const bearingValue = bearing(
+            point(polygonCoords[0]),
+            point(polygonCoords[1])
+          );
+          const orientation = getOrientation(bearingValue);
+
+          setCurrentCenter({ lat: latitude, lng: longitude });
+
+          onPolygonChange?.({
+            coordinates: polygonCoords,
+            area: Math.round(areaValue),
+            orientation,
+            frontageCount: 4,
+            center: { lat: latitude, lng: longitude }
+          });
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          let errorMessage = 'Không thể xác định vị trí của bạn. ';
+
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage += 'Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt và macOS System Preferences.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage += 'Thông tin vị trí không có sẵn.';
+              break;
+            case error.TIMEOUT:
+              errorMessage += 'Hết thời gian chờ định vị vị trí.';
+              break;
+          }
+
+          alert(errorMessage);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    }).catch((error) => {
+      console.error('Permission query error:', error);
+      alert('Lỗi khi kiểm tra quyền truy cập vị trí');
+    });
+  };
+
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="w-full h-full" data-testid="map-container" />
       <div className="absolute top-4 left-4 z-[100]">
         <SearchAutocomplete onSelect={handleSearchSelect} />
       </div>
-      <div className="absolute top-20 left-4 z-[90] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm max-w-xs">
+      <div className="absolute top-20 left-4 z-[100]">
+        <button
+          onClick={handleFindMyLocation}
+          className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm hover:bg-white dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+          title="Tìm vị trí hiện tại của bạn (Fallback cho macOS)"
+        >
+          📍 Vị trí của tôi
+        </button>
+      </div>
+      <div className="absolute top-32 left-4 z-[90] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm max-w-xs">
         <p className="font-semibold text-gray-800 dark:text-gray-100 mb-1">💡 Hướng dẫn vẽ khu đất:</p>
         <p className="text-gray-600 dark:text-gray-300 text-xs">
           1. Click vào icon <span className="inline-block w-6 h-6 align-middle">📐</span> ở góc trên bản đồ<br/>
           2. Click lần lượt để đánh dấu các góc khu đất<br/>
           3. Click vào điểm đầu tiên để hoàn thành polygon
+        </p>
+        <p className="text-gray-600 dark:text-gray-300 text-xs mt-2">
+          📍 <strong>macOS:</strong> Nếu nút định vị không hoạt động, hãy dùng nút "Vị trí của tôi" ở trên
         </p>
       </div>
     </div>
