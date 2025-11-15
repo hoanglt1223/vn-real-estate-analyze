@@ -9,10 +9,11 @@ import MarketPriceCard from '@/components/MarketPriceCard';
 import AIAnalysisCard from '@/components/AIAnalysisCard';
 import RiskAssessmentCard from '@/components/RiskAssessmentCard';
 import InfrastructureLayer from '@/components/InfrastructureLayer';
+import AmenityHeatmap from '@/components/AmenityHeatmap';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Play, FolderOpen } from 'lucide-react';
+import { Play, FolderOpen, Settings, X, MapPin } from 'lucide-react';
 import { analyzeProperty } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { generatePDF } from '@/lib/pdfExport';
@@ -34,6 +35,8 @@ export default function AnalysisPage() {
   const [includeSmallShops, setIncludeSmallShops] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   // Performance optimization: Request cancellation
   const analysisRequestRef = useRef<AbortController>();
@@ -271,20 +274,116 @@ export default function AnalysisPage() {
     }
   };
 
+  // Mobile filters overlay
+  const MobileFiltersOverlay = () => (
+    <div className={`md:hidden fixed inset-0 z-[200] bg-background ${showMobileFilters ? 'block' : 'hidden'}`}>
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-lg font-semibold">Bộ lọc</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowMobileFilters(false)}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <ScrollArea className="flex-1">
+          <div className="p-4 space-y-6">
+            <PropertyInputPanel
+              area={propertyData.area}
+              orientation={propertyData.orientation}
+              frontageCount={propertyData.frontageCount}
+              onCoordinatesSubmit={(lat, lng) => console.log('Coordinates:', lat, lng)}
+            />
+
+            <AmenitiesFilter
+              radius={radius}
+              onRadiusChange={handleRadiusChange}
+              selectedCategories={selectedCategories}
+              onCategoryChange={handleCategoryChange}
+              includeSmallShops={includeSmallShops}
+              onIncludeSmallShopsChange={handleIncludeSmallShopsChange}
+            />
+
+            <InfrastructureLayer
+              selectedLayers={selectedLayers}
+              onLayerChange={handleLayerChange}
+            />
+
+            {/* Heatmap Toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Heatmap mật độ tiện ích
+                </label>
+                <Button
+                  variant={showHeatmap ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowHeatmap(!showHeatmap)}
+                  className="px-3 py-1"
+                >
+                  {showHeatmap ? 'Bật' : 'Tắt'}
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Hiển thị mật độ tiện ích xung quanh khu đất
+              </p>
+            </div>
+
+            {propertyData.area > 0 && propertyData.coordinates.length > 0 && (
+              <Button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing}
+                className="w-full"
+                size="lg"
+              >
+                {isAnalyzing ? (
+                  <>Đang phân tích...</>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    {analysisResults ? 'Phân Tích Lại' : 'Phân Tích Ngay'}
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  );
+
+  // Mobile floating action button
+  const MobileFAB = () => (
+    <div className="md:hidden fixed bottom-4 right-4 z-[150]">
+      <Button
+        onClick={() => setShowMobileFilters(true)}
+        size="lg"
+        className="rounded-full w-14 h-14 shadow-lg"
+      >
+        <Settings className="w-6 h-6" />
+      </Button>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-screen">
-      <div className="border-b bg-background p-2 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Phân Tích Bất Động Sản</h1>
-        <div className="flex items-center gap-2">
+      <div className="border-b bg-background p-2 flex items-center justify-between flex-wrap gap-2">
+        <h1 className="text-lg font-semibold truncate">Phân Tích Bất Động Sản</h1>
+        <div className="flex items-center gap-1 sm:gap-2">
           <Button
             asChild
             variant="ghost"
             size="sm"
             data-testid="button-management"
+            className="px-2 sm:px-3"
           >
             <Link href="/management">
-              <FolderOpen className="w-4 h-4 mr-1" />
-              Quản Lý
+              <FolderOpen className="w-4 h-4 sm:mr-1" />
+              <span className="hidden sm:inline">Quản Lý</span>
             </Link>
           </Button>
           <Button
@@ -293,8 +392,10 @@ export default function AnalysisPage() {
             variant="secondary"
             size="sm"
             data-testid="button-export-pdf"
+            className="px-2 sm:px-3"
           >
-            Xuất PDF
+            <span className="hidden sm:inline">Xuất PDF</span>
+            <span className="sm:hidden">PDF</span>
           </Button>
         </div>
       </div>
@@ -323,6 +424,27 @@ export default function AnalysisPage() {
                 selectedLayers={selectedLayers}
                 onLayerChange={handleLayerChange}
               />
+
+              {/* Heatmap Toggle */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Heatmap mật độ tiện ích
+                  </label>
+                  <Button
+                    variant={showHeatmap ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowHeatmap(!showHeatmap)}
+                    className="px-3 py-1"
+                  >
+                    {showHeatmap ? 'Bật' : 'Tắt'}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Hiển thị mật độ tiện ích xung quanh khu đất
+                </p>
+              </div>
 
               {propertyData.area > 0 && propertyData.coordinates.length > 0 && (
                 <Button
@@ -358,6 +480,7 @@ export default function AnalysisPage() {
               selectedLayers={selectedLayers}
               infrastructure={analysisResults?.infrastructure}
               mapRef={mapRef}
+              showHeatmap={showHeatmap}
             />
           </div>
 
@@ -419,6 +542,10 @@ export default function AnalysisPage() {
           </div>
         )}
       </div>
+
+      {/* Mobile components */}
+      <MobileFiltersOverlay />
+      <MobileFAB />
     </div>
   );
 }
