@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
-import supercluster from 'supercluster';
+import * as supercluster from 'supercluster';
 
 interface Amenity {
   id: string;
@@ -23,6 +23,19 @@ interface ClusterProps {
   transportTypeIcons: Record<string, string>;
   categoryVietnamese: Record<string, string>;
   getEducationTypeLabel: (amenity: Amenity) => string;
+}
+
+interface SuperclusterResult {
+  type: 'FeatureCollection';
+  features: any[];
+}
+
+interface ClusterProperties {
+  cluster: boolean;
+  cluster_id: number;
+  point_count: number;
+  point_count_abbreviated: string;
+  [key: string]: any;
 }
 
 export default function MarkerCluster({
@@ -68,7 +81,7 @@ export default function MarkerCluster({
     };
 
     // Initialize supercluster
-    clusterRef.current = supercluster({
+    clusterRef.current = new supercluster.default({
       radius: 50,
       maxZoom: 16,
       minPoints: 2
@@ -78,6 +91,7 @@ export default function MarkerCluster({
 
     // Get map bounds for current zoom
     const bounds = map.getBounds();
+    if (!bounds) return;
     const zoom = Math.floor(map.getZoom());
 
     // Get clusters within current view
@@ -252,6 +266,7 @@ export default function MarkerCluster({
       if (!map || !clusterRef.current) return;
 
       const bounds = map.getBounds();
+      if (!bounds) return;
       const zoom = Math.floor(map.getZoom());
 
       const clusters = clusterRef.current.getClusters(

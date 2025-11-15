@@ -224,7 +224,7 @@ export async function fetchFromBatdongsan(lat: number, lng: number, radius: numb
         const altListings = await fetchBatdongsanDirectly(altUrl);
         finalListings = altListings;
       } catch (altError) {
-        console.log('Alternative URL also failed:', altError.message);
+        console.log('Alternative URL also failed:', altError instanceof Error ? altError.message : 'Unknown error');
       }
     }
 
@@ -320,9 +320,9 @@ async function fetchBatdongsanDirectly(url: string): Promise<PriceListing[]> {
       }
 
     } catch (error) {
-      console.error(`Error fetching Batdongsan (attempt ${attempt}/${maxRetries}):`, error.message);
+      console.error(`Error fetching Batdongsan (attempt ${attempt}/${maxRetries}):`, error instanceof Error ? error.message : 'Unknown error');
 
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log('Request timed out');
       }
 
@@ -403,7 +403,7 @@ function parseBatdongsanHTML(html: string, baseUrl: string): PriceListing[] {
               }
             }
           } catch (e) {
-            console.error('Error parsing Batdongsan JSON data:', e.message);
+            console.error('Error parsing Batdongsan JSON data:', e instanceof Error ? e.message : 'Unknown error');
           }
         }
       }

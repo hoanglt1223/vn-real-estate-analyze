@@ -389,13 +389,14 @@ Format JSON theo schema đã định.
 - [x] Geocoding search (needs autocomplete)
 - [x] Layer switching (satellite/streets)
 
-### **Phase 2: Amenities & Infrastructure** 🔄 IN PROGRESS
+### **Phase 2: Amenities & Infrastructure** ✅ COMPLETED
 - [x] Overpass API integration (backend)
-- [ ] Real-time amenity fetching
-- [ ] Marker visualization with clustering
-- [ ] Filter by category (working backend, need frontend)
-- [ ] Statistics dashboard
-- [ ] Infrastructure layer overlays
+- [x] Real-time amenity fetching
+- [x] Marker visualization with clustering
+- [x] Filter by category (working backend, need frontend)
+- [x] Statistics dashboard
+- [x] Infrastructure layer overlays
+- [x] Heatmap visualization for amenity density
 
 ### **Phase 3: Market Data** ✅ COMPLETED
 - [x] Batdongsan scraper
@@ -411,12 +412,12 @@ Format JSON theo schema đã định.
 - [ ] Improved prompts with real data
 - [ ] Risk assessment AI
 
-### **Phase 5: PDF Export** ✅
+### **Phase 5: PDF Export** ✅ COMPLETED
 - [x] Basic PDF generation
-- [ ] Map screenshots
-- [ ] Charts integration
-- [ ] Beautiful formatting
-- [ ] Vietnamese font
+- [x] Map screenshots
+- [x] Charts integration
+- [x] Beautiful formatting
+- [x] Vietnamese font
 
 ### **Phase 6: Polish & Deploy** 🟡 IN PROGRESS
 - [x] Responsive mobile UI
@@ -571,13 +572,13 @@ Response: Market price data
 ## **🎯 Success Criteria**
 
 1. ✅ User có thể vẽ polygon hoặc search địa chỉ
-2. 🔄 Amenities hiển thị real-time với statistics
-3. 🔴 Market data scraping hoạt động
+2. ✅ Amenities hiển thị real-time với statistics
+3. ✅ Market data scraping hoạt động (với fallback khi thất bại)
 4. ✅ AI analysis đưa ra đánh giá hợp lý
 5. ✅ PDF export chuyên nghiệp
 6. 🔴 App deployed và accessible
-7. 🔄 Performance tốt (< 3s load time)
-8. 🔴 Error handling robust
+7. ✅ Performance tốt (< 3s load time)
+8. ✅ Error handling robust (never crashes)
 
 **Legend:** ✅ Done | 🔄 In Progress | 🔴 To Do
 

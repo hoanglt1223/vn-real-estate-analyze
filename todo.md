@@ -27,7 +27,7 @@
 
 ### 5. Map Enhancements
 - [x] Thêm marker clustering cho nhiều amenities
-- [ ] Thêm heatmap layer cho mật độ tiện ích
+- [x] Thêm heatmap layer cho mật độ tiện ích
 - [ ] 3D buildings layer (Mapbox feature)
 - [x] Custom marker icons cho từng loại amenity
 
@@ -275,3 +275,7 @@
 - ✅ Improved mobile UX with truncated text and responsive buttons
 - ✅ Added comprehensive error handling that never fails the application
 - ✅ All critical features now have robust fallback mechanisms
+- ✅ Fixed critical TypeScript compilation errors in key components
+- ✅ Implemented AmenityHeatmap component for density visualization
+- ✅ Added heatmap toggle controls for both mobile and desktop
+- ✅ Integrated heatmap layer with configurable intensity and radius

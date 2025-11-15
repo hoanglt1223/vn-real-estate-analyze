@@ -4,6 +4,7 @@ import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import { polygon, area, bearing, point, centroid, circle, destination } from '@turf/turf';
 import SearchAutocomplete from './SearchAutocomplete';
 import MarkerCluster from './MarkerCluster';
+import AmenityHeatmap from './AmenityHeatmap';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
@@ -41,6 +42,7 @@ interface MapViewProps {
   selectedLayers?: string[];
   infrastructure?: any;
   mapRef?: React.RefObject<any>;
+  showHeatmap?: boolean;
 }
 
 const categoryColors: Record<string, string> = {
@@ -130,7 +132,8 @@ export default function MapView({
   selectedCategories = [],
   selectedLayers = [],
   infrastructure,
-  mapRef
+  mapRef,
+  showHeatmap = false
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -723,6 +726,129 @@ export default function MapView({
     });
   }, [infrastructure, selectedLayers, isLoaded, styleLoaded]);
 
+  const handleFindMyLocation = () => {
+    if (!map.current || !draw.current) return;
+
+    // Fallback geolocation implementation for macOS
+    if (!navigator.geolocation) {
+      alert('Trình duyệt của bạn không hỗ trợ định vị vị trí');
+      return;
+    }
+
+    const attemptGeolocation = (attemptNumber: number = 1) => {
+      console.log(`Geolocation attempt ${attemptNumber}`);
+
+      // Request current position with retry logic
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log(`Fallback location found (attempt ${attemptNumber}):`, latitude, longitude);
+
+          // Validate coordinates from geolocation
+          if (!isValidCoordinate(longitude, latitude)) {
+            console.error('Invalid coordinates from geolocation fallback:', [longitude, latitude]);
+            return;
+          }
+
+          try {
+            // Center map on user location
+            map.current!.flyTo({
+              center: [longitude, latitude],
+              zoom: 18,
+              duration: 1500
+            });
+
+            // Create 10m x 10m square (5m from center to each edge) around user location
+            const polygonCoords = createSquareAroundPoint(longitude, latitude, 5);
+
+            draw.current!.deleteAll();
+            const feature = {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [polygonCoords]
+              },
+              properties: {},
+              id: undefined
+            };
+            draw.current!.add(feature as any);
+
+            const turfPolygon = polygon([polygonCoords]);
+            const areaValue = area(turfPolygon);
+            const bearingValue = bearing(
+              safeCreatePoint(polygonCoords[0][0], polygonCoords[0][1]),
+              safeCreatePoint(polygonCoords[1][0], polygonCoords[1][1])
+            );
+            const orientation = getOrientation(bearingValue);
+
+            setCurrentCenter({ lat: latitude, lng: longitude });
+
+            onPolygonChange?.({
+              coordinates: polygonCoords,
+              area: Math.round(areaValue),
+              orientation,
+              frontageCount: 4,
+              center: { lat: latitude, lng: longitude }
+            });
+          } catch (error) {
+            console.error('Error creating polygon from geolocation fallback:', error);
+          }
+        },
+        (error) => {
+          console.error(`Geolocation error (attempt ${attemptNumber}):`, error);
+
+          // Retry on timeout up to 3 times
+          if (error.code === error.TIMEOUT && attemptNumber < 3) {
+            console.log('Timeout occurred, retrying...');
+            setTimeout(() => attemptGeolocation(attemptNumber + 1), 2000); // Wait 2 seconds before retry
+            return;
+          }
+
+          let errorMessage = `Không thể xác định vị trí của bạn (thử ${attemptNumber}/3). `;
+
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage += 'Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt và macOS System Preferences > Security & Privacy > Location Services.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage += 'Thông tin vị trí không có sẵn. Vui lòng kiểm tra GPS/WiFi.';
+              break;
+            case error.TIMEOUT:
+              errorMessage += 'Hết thời gian chờ định vị vị trí. Vui lòng thử lại hoặc kiểm tra kết nối internet.';
+              break;
+          }
+
+          // Suggest alternatives for macOS
+          if (navigator.platform && navigator.platform.includes('Mac')) {
+            errorMessage += '\n\nGợi ý cho macOS:\n- Kiểm tra System Preferences > Security & Privacy > Location Services\n- Thử dùng WiFi thay vì chỉ dùng Ethernet\n- Di chuyển đến nơi có tín hiệu GPS tốt hơn';
+          }
+
+          alert(errorMessage);
+        },
+        {
+          enableHighAccuracy: attemptNumber === 1, // Use high accuracy only on first attempt
+          timeout: attemptNumber === 1 ? 30000 : 20000, // Shorter timeout for retries
+          maximumAge: attemptNumber === 1 ? 60000 : 300000 // Allow older cached positions for retries
+        }
+      );
+    };
+
+    // Check if we have permission first
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      if (result.state === 'denied') {
+        alert('Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt và macOS System Preferences > Security & Privacy > Location Services.');
+        return;
+      }
+
+      // Start geolocation attempts
+      attemptGeolocation();
+    }).catch((error) => {
+      console.error('Permission query error:', error);
+      // Proceed with geolocation anyway as permission check failed
+      attemptGeolocation();
+    });
+  };
+
   // Use MarkerCluster for better performance with many amenities
   return (
     <div className="relative w-full h-full">
@@ -766,6 +892,18 @@ export default function MapView({
           transportTypeIcons={transportTypeIcons}
           categoryVietnamese={categoryVietnamese}
           getEducationTypeLabel={getEducationTypeLabel}
+        />
+      )}
+
+      {/* Add AmenityHeatmap component */}
+      {map.current && isLoaded && (
+        <AmenityHeatmap
+          map={map.current}
+          amenities={amenities}
+          selectedCategories={selectedCategories}
+          radius={radius}
+          visible={showHeatmap}
+          intensity={0.7}
         />
       )}
     </div>

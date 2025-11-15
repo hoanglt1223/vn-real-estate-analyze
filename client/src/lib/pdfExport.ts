@@ -389,7 +389,7 @@ function drawScoreChart(pdf: jsPDF, scores: any, x: number, y: number, width: nu
 function addWatermarkAndFooter(pdf: jsPDF) {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const pageCount = pdf.internal.getNumberOfPages();
+  const pageCount = (pdf as any).internal.getNumberOfPages();
 
   for (let i = 1; i <= pageCount; i++) {
     pdf.setPage(i);
@@ -398,13 +398,13 @@ function addWatermarkAndFooter(pdf: jsPDF) {
     pdf.setTextColor(240, 240, 240);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(60);
-    pdf.saveGraphicsState();
-    pdf.setGState(new pdf.GState({ opacity: 0.1 }));
+    (pdf as any).saveGraphicsState();
+    (pdf as any).setGState({ opacity: 0.1 });
     pdf.text('Vietnam Real Estate Analysis', pageWidth / 2, pageHeight / 2, {
       align: 'center',
       angle: 45
     });
-    pdf.restoreGraphicsState();
+    (pdf as any).restoreGraphicsState();
 
     // Add footer
     pdf.setTextColor(100, 100, 100);

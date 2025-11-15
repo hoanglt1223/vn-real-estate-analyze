@@ -9,10 +9,11 @@ import MarketPriceCard from '@/components/MarketPriceCard';
 import AIAnalysisCard from '@/components/AIAnalysisCard';
 import RiskAssessmentCard from '@/components/RiskAssessmentCard';
 import InfrastructureLayer from '@/components/InfrastructureLayer';
+import AmenityHeatmap from '@/components/AmenityHeatmap';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Play, FolderOpen, Settings, X } from 'lucide-react';
+import { Play, FolderOpen, Settings, X, MapPin } from 'lucide-react';
 import { analyzeProperty } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { generatePDF } from '@/lib/pdfExport';
@@ -35,6 +36,7 @@ export default function AnalysisPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   // Performance optimization: Request cancellation
   const analysisRequestRef = useRef<AbortController>();
@@ -310,6 +312,27 @@ export default function AnalysisPage() {
               onLayerChange={handleLayerChange}
             />
 
+            {/* Heatmap Toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Heatmap mật độ tiện ích
+                </label>
+                <Button
+                  variant={showHeatmap ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowHeatmap(!showHeatmap)}
+                  className="px-3 py-1"
+                >
+                  {showHeatmap ? 'Bật' : 'Tắt'}
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Hiển thị mật độ tiện ích xung quanh khu đất
+              </p>
+            </div>
+
             {propertyData.area > 0 && propertyData.coordinates.length > 0 && (
               <Button
                 onClick={handleAnalyze}
@@ -402,6 +425,27 @@ export default function AnalysisPage() {
                 onLayerChange={handleLayerChange}
               />
 
+              {/* Heatmap Toggle */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Heatmap mật độ tiện ích
+                  </label>
+                  <Button
+                    variant={showHeatmap ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowHeatmap(!showHeatmap)}
+                    className="px-3 py-1"
+                  >
+                    {showHeatmap ? 'Bật' : 'Tắt'}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Hiển thị mật độ tiện ích xung quanh khu đất
+                </p>
+              </div>
+
               {propertyData.area > 0 && propertyData.coordinates.length > 0 && (
                 <Button
                   onClick={handleAnalyze}
@@ -436,6 +480,7 @@ export default function AnalysisPage() {
               selectedLayers={selectedLayers}
               infrastructure={analysisResults?.infrastructure}
               mapRef={mapRef}
+              showHeatmap={showHeatmap}
             />
           </div>
 
