@@ -291,14 +291,14 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-6">
+        <ScrollArea className="h-[60vh] max-h-[400px] min-h-[300px] pr-2 sm:pr-4">
+          <div className="space-y-4 sm:space-y-6">
             {Object.entries(groupedAmenities).map(([category, items]) => (
               <div key={category} className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold">
+                <div className="flex items-center gap-2 text-sm font-semibold flex-wrap">
                   {categoryIcons[category]}
-                  <span>{categoryNames[category]}</span>
-                  <Badge variant="outline" className="ml-auto">
+                  <span className="truncate">{categoryNames[category]}</span>
+                  <Badge variant="outline" className="ml-auto shrink-0">
                     {items.length}
                   </Badge>
                 </div>
@@ -309,34 +309,35 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
                     return (
                       <div
                         key={amenity.id}
-                        className="flex items-start gap-3 p-3 rounded-md hover-elevate active-elevate-2 cursor-pointer border"
+                        className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-md hover-elevate active-elevate-2 cursor-pointer border"
                         onClick={() => onAmenityClick?.(amenity)}
                         data-testid={`amenity-${amenity.id}`}
                       >
-                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                             <p className="text-sm font-medium truncate">
                               {amenity.name}
                             </p>
                             {amenity.isChain && (
-                              <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                              <Badge variant="secondary" className="text-xs px-1 py-0.5 shrink-0">
                                 <Star className="w-3 h-3 mr-1" />
-                                Chuỗi
+                                <span className="hidden sm:inline">Chuỗi</span>
+                                <span className="sm:hidden">C</span>
                               </Badge>
                             )}
                           </div>
                           {typeLabel && (
-                            <p className="text-xs text-primary font-medium mt-0.5">
+                            <p className="text-xs text-primary font-medium mt-0.5 truncate">
                               {typeLabel}
                             </p>
                           )}
-                          <div className="flex items-center gap-3 mt-1">
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="w-3 h-3" />
-                              {amenity.walkTime} phút đi bộ
+                          <div className="flex items-center gap-2 sm:gap-3 mt-1 flex-wrap">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                              <Clock className="w-3 h-3 shrink-0" />
+                              {amenity.walkTime} phút
                             </div>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
                               ({amenity.distance >= 1000
                                 ? `${(amenity.distance / 1000).toFixed(1)} km`
                                 : `${amenity.distance} m`})

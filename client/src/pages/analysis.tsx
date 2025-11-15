@@ -324,9 +324,9 @@ export default function AnalysisPage() {
       </div>
       
       <div className="flex-1 flex overflow-hidden">
-        <div className="hidden lg:block w-80 xl:w-96 border-r bg-background">
+        <div className="hidden md:block w-72 lg:w-80 xl:w-96 border-r bg-background">
           <ScrollArea className="h-full">
-            <div className="p-6 space-y-6">
+            <div className="p-4 md:p-6 space-y-4 md:space-y-6">
               <PropertyInputPanel
                 area={propertyData.area}
                 orientation={propertyData.orientation}
@@ -391,15 +391,15 @@ export default function AnalysisPage() {
           </div>
 
           {analysisResults && (
-            <div className="lg:hidden">
+            <div className="md:hidden">
               <Tabs defaultValue="analysis" className="w-full">
-                <TabsList className="w-full rounded-none">
-                  <TabsTrigger value="analysis" className="flex-1">Phân tích</TabsTrigger>
-                  <TabsTrigger value="amenities" className="flex-1">Tiện ích</TabsTrigger>
-                  <TabsTrigger value="risk" className="flex-1">Rủi ro</TabsTrigger>
+                <TabsList className="w-full rounded-none h-12">
+                  <TabsTrigger value="analysis" className="flex-1 text-xs sm:text-sm">Phân tích</TabsTrigger>
+                  <TabsTrigger value="amenities" className="flex-1 text-xs sm:text-sm">Tiện ích</TabsTrigger>
+                  <TabsTrigger value="risk" className="flex-1 text-xs sm:text-sm">Rủi ro</TabsTrigger>
                 </TabsList>
-                <ScrollArea className="h-[300px]">
-                  <TabsContent value="analysis" className="p-4 space-y-4">
+                <ScrollArea className="h-[40vh] min-h-[300px] max-h-[60vh]">
+                  <TabsContent value="analysis" className="p-3 sm:p-4 space-y-3 sm:space-y-4">
                     <AIAnalysisCard
                       scores={analysisResults.aiAnalysis.scores}
                       scoreExplanations={analysisResults.aiAnalysis.scoreExplanations}
@@ -409,14 +409,14 @@ export default function AnalysisPage() {
                     />
                     <MarketPriceCard data={analysisResults.marketData} />
                   </TabsContent>
-                  <TabsContent value="amenities" className="p-4 space-y-4">
+                  <TabsContent value="amenities" className="p-3 sm:p-4 space-y-3 sm:space-y-4">
                     <AmenityStatistics
                       amenities={getAllAmenities()}
                       onAmenityClick={handleAmenityClick}
                     />
                     <AmenityList amenities={getAllAmenities()} />
                   </TabsContent>
-                  <TabsContent value="risk" className="p-4">
+                  <TabsContent value="risk" className="p-3 sm:p-4">
                     <RiskAssessmentCard risks={analysisResults.risks} overallRiskLevel={analysisResults.overallRiskLevel} />
                   </TabsContent>
                 </ScrollArea>
@@ -426,9 +426,9 @@ export default function AnalysisPage() {
         </div>
 
         {analysisResults && (
-          <div className="hidden lg:block w-80 xl:w-96 border-l bg-background">
+          <div className="hidden md:block w-72 lg:w-80 xl:w-96 border-l bg-background">
             <ScrollArea className="h-full">
-              <div className="p-6 space-y-6">
+              <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                 <AIAnalysisCard
                   scores={analysisResults.aiAnalysis.scores}
                   scoreExplanations={analysisResults.aiAnalysis.scoreExplanations}

@@ -83,14 +83,17 @@ export default function AmenityStatistics({ amenities, onAmenityClick }: Amenity
         ) : (
           <>
             {availableCategories.length > 1 && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1 sm:gap-2 max-w-full overflow-x-auto">
                 <Button
                   variant={selectedCategory === 'all' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCategory('all')}
+                  className="text-xs sm:text-sm whitespace-nowrap shrink-0"
                   data-testid="filter-all"
                 >
-                  Tất cả ({amenities.length})
+                  <span className="hidden sm:inline">Tất cả</span>
+                  <span className="sm:hidden">Tất</span>
+                  ({amenities.length})
                 </Button>
                 {availableCategories.map(category => (
                   <Button
@@ -98,6 +101,7 @@ export default function AmenityStatistics({ amenities, onAmenityClick }: Amenity
                     variant={selectedCategory === category ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedCategory(category)}
+                    className="text-xs sm:text-sm whitespace-nowrap shrink-0"
                     data-testid={`filter-${category}`}
                   >
                     {categoryNames[category] || category} ({categoryCounts[category]})
@@ -138,17 +142,17 @@ export default function AmenityStatistics({ amenities, onAmenityClick }: Amenity
                   {topAmenities.map((amenity, index) => (
                     <div
                       key={amenity.id}
-                      className="flex items-start justify-between text-xs p-2 rounded-md bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
+                      className="flex items-start justify-between text-xs p-2 rounded-md bg-muted/50 hover:bg-muted cursor-pointer transition-colors gap-2"
                       onClick={() => onAmenityClick?.(amenity)}
                       data-testid={`nearest-amenity-${index}`}
                     >
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{amenity.name}</p>
-                        <p className="text-muted-foreground">
+                        <p className="text-muted-foreground truncate">
                           {categoryNames[amenity.category] || amenity.category}
                         </p>
                       </div>
-                      <Badge variant="outline" className="ml-2 flex-shrink-0">
+                      <Badge variant="outline" className="shrink-0">
                         {Math.round(amenity.distance || 0)}m
                       </Badge>
                     </div>
