@@ -28,74 +28,31 @@ export default function AnalysisPage() {
     center: { lat: 0, lng: 0 }
   });
   const [radius, setRadius] = useState(1000);
-  const [selectedCategories, setSelectedCategories] = useState(['education', 'healthcare']);
-  const [selectedLayers, setSelectedLayers] = useState(['roads', 'metro']);
-  const [includeSmallShops, setIncludeSmallShops] = useState(false);
+  // Set all categories and layers by default
+  const [selectedCategories, setSelectedCategories] = useState(['education', 'healthcare', 'shopping', 'entertainment', 'transport']);
+  const [selectedLayers, setSelectedLayers] = useState(['roads', 'metro', 'metro_lines', 'bus_routes', 'industrial', 'power', 'cemetery', 'water']);
+  const [includeSmallShops, setIncludeSmallShops] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
 
-  // Performance optimization: Debouncing and cancellation
-  const debounceTimerRef = useRef<NodeJS.Timeout>();
+  // Performance optimization: Request cancellation
   const analysisRequestRef = useRef<AbortController>();
-  const [pendingAnalysis, setPendingAnalysis] = useState(false);
 
-  // Debounced filter change handlers
-  const debouncedAnalyze = useCallback(
-    (analysisRadius: number, analysisCategories: string[], analysisLayers: string[], analysisIncludeSmallShops: boolean = false) => {
-      // Clear any existing timer
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-
-      // Cancel any ongoing request
-      if (analysisRequestRef.current) {
-        analysisRequestRef.current.abort();
-      }
-
-      // Set pending state for UI feedback
-      setPendingAnalysis(true);
-
-      // Set new timer for debounced analysis
-      debounceTimerRef.current = setTimeout(async () => {
-        await handleAnalyze(analysisRadius, analysisCategories, analysisLayers, analysisIncludeSmallShops);
-        setPendingAnalysis(false);
-      }, 1200); // Increased debounce time for better performance
-
-      return () => {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-      };
-    },
-    []
-  );
-
+  // Simple filter change handlers (no automatic analysis)
   const handleRadiusChange = (newRadius: number) => {
     setRadius(newRadius);
-    if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
-      debouncedAnalyze(newRadius, selectedCategories, selectedLayers, includeSmallShops);
-    }
   };
 
   const handleCategoryChange = (categories: string[]) => {
     setSelectedCategories(categories);
-    if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
-      debouncedAnalyze(radius, categories, selectedLayers, includeSmallShops);
-    }
   };
 
   const handleLayerChange = (layers: string[]) => {
     setSelectedLayers(layers);
-    if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
-      debouncedAnalyze(radius, selectedCategories, layers, includeSmallShops);
-    }
   };
 
   const handleIncludeSmallShopsChange = (includeSmall: boolean) => {
     setIncludeSmallShops(includeSmall);
-    if (propertyData.area > 0 && propertyData.coordinates.length > 0) {
-      debouncedAnalyze(radius, selectedCategories, selectedLayers, includeSmall);
-    }
   };
 
   // Convert infrastructure data to amenities format for statistics
@@ -144,9 +101,6 @@ export default function AnalysisPage() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
       if (analysisRequestRef.current) {
         analysisRequestRef.current.abort();
       }
@@ -187,12 +141,21 @@ export default function AnalysisPage() {
     }
   };
 
-  const handleAnalyze = async (forceRadius?: number, forceCategories?: string[], forceLayers?: string[], forceIncludeSmallShops?: boolean) => {
-    // More robust validation for area and coordinates
-    if (!propertyData.coordinates || propertyData.coordinates.length === 0 || !propertyData.area || propertyData.area <= 0) {
+  const handleAnalyze = async () => {
+    // Enhanced validation for polygon data
+    if (!propertyData.coordinates || propertyData.coordinates.length === 0) {
       toast({
         title: 'Lỗi',
         description: 'Vui lòng vẽ khu đất trên bản đồ trước',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!propertyData.area || propertyData.area <= 0) {
+      toast({
+        title: 'Lỗi',
+        description: 'Khu đất có diện tích không hợp lệ. Vui lòng vẽ lại khu đất.',
         variant: 'destructive'
       });
       return;
@@ -202,16 +165,30 @@ export default function AnalysisPage() {
     if (propertyData.coordinates.length < 3) {
       toast({
         title: 'Lỗi',
-        description: 'Khu đất không hợp lệ. Vui lòng vẽ lại khu đất.',
+        description: 'Khu đất không hợp lệ. Cần ít nhất 3 điểm để tạo khu đất. Vui lòng vẽ lại.',
         variant: 'destructive'
       });
       return;
     }
 
-    const analysisRadius = forceRadius ?? radius;
-    const analysisCategories = forceCategories ?? selectedCategories;
-    const analysisLayers = forceLayers ?? selectedLayers;
-    const analysisIncludeSmallShops = forceIncludeSmallShops ?? includeSmallShops;
+    // Validate coordinate format
+    const hasValidCoordinates = propertyData.coordinates.every(coord =>
+      Array.isArray(coord) &&
+      coord.length >= 2 &&
+      typeof coord[0] === 'number' &&
+      typeof coord[1] === 'number' &&
+      !isNaN(coord[0]) &&
+      !isNaN(coord[1])
+    );
+
+    if (!hasValidCoordinates) {
+      toast({
+        title: 'Lỗi',
+        description: 'Dữ liệu tọa độ không hợp lệ. Vui lòng vẽ lại khu đất.',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     // Cancel any ongoing request
     if (analysisRequestRef.current) {
@@ -227,10 +204,10 @@ export default function AnalysisPage() {
     try {
       const results = await analyzeProperty({
         coordinates: propertyData.coordinates,
-        radius: analysisRadius,
-        categories: analysisCategories,
-        layers: analysisLayers,
-        includeSmallShops: analysisIncludeSmallShops,
+        radius: radius,
+        categories: selectedCategories,
+        layers: selectedLayers,
+        includeSmallShops: includeSmallShops,
         signal: abortController.signal
       });
 
@@ -256,7 +233,6 @@ export default function AnalysisPage() {
       // Only update loading state if this request wasn't aborted
       if (!abortController.signal.aborted) {
         setIsAnalyzing(false);
-        setPendingAnalysis(false);
       }
     }
   };
@@ -348,21 +324,16 @@ export default function AnalysisPage() {
                 onLayerChange={handleLayerChange}
               />
 
-              {propertyData.area > 0 && (
+              {propertyData.area > 0 && propertyData.coordinates.length > 0 && (
                 <Button
-                  onClick={() => handleAnalyze()}
+                  onClick={handleAnalyze}
                   disabled={isAnalyzing}
-                  className={`w-full ${pendingAnalysis && !isAnalyzing ? 'animate-pulse' : ''}`}
+                  className="w-full"
                   size="lg"
                   data-testid="button-analyze"
                 >
                   {isAnalyzing ? (
                     <>Đang phân tích...</>
-                  ) : pendingAnalysis ? (
-                    <>
-                      <Play className="w-4 h-4 mr-2 opacity-50" />
-                      Đang chờ phân tích...
-                    </>
                   ) : (
                     <>
                       <Play className="w-4 h-4 mr-2" />

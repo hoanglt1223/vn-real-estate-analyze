@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
-import { polygon, area, bearing, point, centroid, circle } from '@turf/turf';
+import { polygon, area, bearing, point, centroid, circle, destination } from '@turf/turf';
 import SearchAutocomplete from './SearchAutocomplete';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -189,6 +189,47 @@ export default function MapView({
     return point([lng, lat]);
   }
 
+  // Helper function to create a square around a center point
+  function createSquareAroundPoint(lng: number, lat: number, halfSize: number = 5): number[][] {
+    const center = safeCreatePoint(lng, lat);
+
+    try {
+      // Calculate square corners using destination function
+      const topRight = destination(center, halfSize * Math.sqrt(2), 45, { units: 'meters' });
+      const bottomLeft = destination(center, halfSize * Math.sqrt(2), 225, { units: 'meters' });
+
+      // Get corners
+      const tr = topRight.geometry.coordinates;
+      const bl = bottomLeft.geometry.coordinates;
+
+      // Calculate other corners
+      const topLeft = destination(center, halfSize * Math.sqrt(2), 135, { units: 'meters' });
+      const bottomRight = destination(center, halfSize * Math.sqrt(2), 315, { units: 'meters' });
+
+      const tl = topLeft.geometry.coordinates;
+      const br = bottomRight.geometry.coordinates;
+
+      return [
+        [bl[0], bl[1]], // Bottom-left
+        [br[0], br[1]], // Bottom-right
+        [tr[0], tr[1]], // Top-right
+        [tl[0], tl[1]], // Top-left
+        [bl[0], bl[1]]  // Close polygon
+      ];
+    } catch (error) {
+      console.error('Error creating square:', error);
+      // Fallback to simple calculation
+      const offset = halfSize / 111320; // rough approximation
+      return [
+        [lng - offset, lat - offset], // Bottom-left
+        [lng + offset, lat - offset], // Bottom-right
+        [lng + offset, lat + offset], // Top-right
+        [lng - offset, lat + offset], // Top-left
+        [lng - offset, lat - offset]  // Close polygon
+      ];
+    }
+  }
+
   const handleSearchSelect = (result: any) => {
     if (!map.current || !draw.current) return;
 
@@ -208,16 +249,12 @@ export default function MapView({
     try {
       map.current.flyTo({
         center: [lng, lat],
-        zoom: 16,
+        zoom: 18,
         duration: 1500
       });
 
-      // Tạo circle bán kính 5m xung quanh điểm được chọn
-      const centerPoint = safeCreatePoint(lng, lat);
-      const options = { steps: 32, units: 'meters' as const };
-      const circlePolygon = circle(centerPoint, 5, options); // 5m bán kính
-
-      const polygonCoords = circlePolygon.geometry.coordinates[0];
+      // Tạo ô vuông 10m x 10m (cách tâm 5m mỗi cạnh) xung quanh điểm được chọn
+      const polygonCoords = createSquareAroundPoint(lng, lat, 5);
 
       draw.current.deleteAll();
       const feature = {
@@ -300,7 +337,7 @@ export default function MapView({
           return;
         }
 
-        // Auto-create 10m radius area around user's location
+        // Auto-create 10m x 10m square (5m from center to edges) around user's location
         if (draw.current && map.current) {
           try {
             // Center map on user location with appropriate zoom
@@ -310,12 +347,8 @@ export default function MapView({
               duration: 1500
             });
 
-            // Create 5m radius circle around user location
-            const centerPoint = safeCreatePoint(longitude, latitude);
-            const options = { steps: 32, units: 'meters' as const };
-            const circlePolygon = circle(centerPoint, 5, options); // 5m radius
-
-            const polygonCoords = circlePolygon.geometry.coordinates[0];
+            // Create 10m x 10m square (5m from center to each edge) around user location
+            const polygonCoords = createSquareAroundPoint(longitude, latitude, 5);
 
             draw.current.deleteAll();
             const feature = {
@@ -793,12 +826,8 @@ export default function MapView({
               duration: 1500
             });
 
-            // Create 5m radius circle around user location
-            const centerPoint = safeCreatePoint(longitude, latitude);
-            const options = { steps: 32, units: 'meters' as const };
-            const circlePolygon = circle(centerPoint, 5, options); // 5m radius
-
-            const polygonCoords = circlePolygon.geometry.coordinates[0];
+            // Create 10m x 10m square (5m from center to each edge) around user location
+            const polygonCoords = createSquareAroundPoint(longitude, latitude, 5);
 
             draw.current!.deleteAll();
             const feature = {
@@ -904,14 +933,18 @@ export default function MapView({
         </button>
       </div>
       <div className="absolute top-32 left-4 z-[90] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md text-sm max-w-xs">
-        <p className="font-semibold text-gray-800 dark:text-gray-100 mb-1">💡 Hướng dẫn vẽ khu đất:</p>
+        <p className="font-semibold text-gray-800 dark:text-gray-100 mb-1">💡 Hướng dẫn sử dụng:</p>
         <p className="text-gray-600 dark:text-gray-300 text-xs">
+          <strong>Tự động tạo ô vuông:</strong><br/>
+          • 📍 Tìm vị trí: Chọn địa điểm ở thanh tìm kiếm<br/>
+          • 📍 Định vị: Bấm "Vị trí của tôi" hoặc nút định vị bản đồ<br/><br/>
+          <strong>Vẽ thủ công:</strong><br/>
           1. Click vào icon <span className="inline-block w-6 h-6 align-middle">📐</span> ở góc trên bản đồ<br/>
           2. Click lần lượt để đánh dấu các góc khu đất<br/>
           3. Click vào điểm đầu tiên để hoàn thành polygon
         </p>
         <p className="text-gray-600 dark:text-gray-300 text-xs mt-2">
-          📍 <strong>macOS:</strong> Nếu nút định vị không hoạt động, hãy dùng nút "Vị trí của tôi" ở trên
+          ✅ Khu đất 10m×10m sẽ được tự tạo khi bạn tìm hoặc định vị vị trí
         </p>
       </div>
     </div>
