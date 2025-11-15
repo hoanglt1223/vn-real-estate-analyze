@@ -165,19 +165,44 @@ export default function AnalysisPage() {
 
   const handleAmenityClick = (amenity: any) => {
     if (mapRef.current && mapRef.current.flyTo) {
-      mapRef.current.flyTo({
-        center: [amenity.lon, amenity.lat],
-        zoom: 17,
-        duration: 1000
-      });
+      // Validate coordinates before flying to amenity
+      if (
+        typeof amenity?.lon === 'number' &&
+        typeof amenity?.lat === 'number' &&
+        !isNaN(amenity.lon) &&
+        !isNaN(amenity.lat) &&
+        amenity.lon >= -180 &&
+        amenity.lon <= 180 &&
+        amenity.lat >= -90 &&
+        amenity.lat <= 90
+      ) {
+        mapRef.current.flyTo({
+          center: [amenity.lon, amenity.lat],
+          zoom: 17,
+          duration: 1000
+        });
+      } else {
+        console.error('Invalid amenity coordinates for flyTo:', amenity);
+      }
     }
   };
 
   const handleAnalyze = async (forceRadius?: number, forceCategories?: string[], forceLayers?: string[], forceIncludeSmallShops?: boolean) => {
-    if (!propertyData.coordinates || propertyData.coordinates.length === 0 || propertyData.area <= 0) {
+    // More robust validation for area and coordinates
+    if (!propertyData.coordinates || propertyData.coordinates.length === 0 || !propertyData.area || propertyData.area <= 0) {
       toast({
         title: 'Lỗi',
         description: 'Vui lòng vẽ khu đất trên bản đồ trước',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Additional validation: check if coordinates form a valid polygon
+    if (propertyData.coordinates.length < 3) {
+      toast({
+        title: 'Lỗi',
+        description: 'Khu đất không hợp lệ. Vui lòng vẽ lại khu đất.',
         variant: 'destructive'
       });
       return;

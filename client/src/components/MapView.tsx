@@ -152,53 +152,106 @@ export default function MapView({
     return 'Tây Bắc';
   }
 
+  // Helper function to validate coordinates
+  function isValidCoordinate(lng: number, lat: number): boolean {
+    return (
+      typeof lng === 'number' &&
+      typeof lat === 'number' &&
+      !isNaN(lng) &&
+      !isNaN(lat) &&
+      isFinite(lng) &&
+      isFinite(lat) &&
+      lng >= -180 &&
+      lng <= 180 &&
+      lat >= -90 &&
+      lat <= 90
+    );
+  }
+
+  // Helper function to validate coordinate array
+  function isValidCoordinateArray(coords: number[][]): boolean {
+    return (
+      Array.isArray(coords) &&
+      coords.length > 0 &&
+      coords.every(coord =>
+        Array.isArray(coord) &&
+        coord.length >= 2 &&
+        isValidCoordinate(coord[0], coord[1])
+      )
+    );
+  }
+
+  // Helper function to safely create a point with error handling
+  function safeCreatePoint(lng: number, lat: number) {
+    if (!isValidCoordinate(lng, lat)) {
+      throw new Error(`Invalid coordinates: [${lng}, ${lat}]`);
+    }
+    return point([lng, lat]);
+  }
+
   const handleSearchSelect = (result: any) => {
     if (!map.current || !draw.current) return;
 
+    if (!result || !result.center || !Array.isArray(result.center) || result.center.length < 2) {
+      console.error('Invalid search result:', result);
+      return;
+    }
+
     const [lng, lat] = result.center;
 
-    map.current.flyTo({
-      center: [lng, lat],
-      zoom: 16,
-      duration: 1500
-    });
+    // Validate coordinates before using them
+    if (!isValidCoordinate(lng, lat)) {
+      console.error('Invalid coordinates from search result:', [lng, lat]);
+      return;
+    }
 
-    // Tạo circle bán kính 10m xung quanh điểm được chọn
-    const centerPoint = point([lng, lat]);
-    const options = { steps: 32, units: 'meters' as const };
-    const circlePolygon = circle(centerPoint, 10, options); // 10m bán kính
+    try {
+      map.current.flyTo({
+        center: [lng, lat],
+        zoom: 16,
+        duration: 1500
+      });
 
-    const polygonCoords = circlePolygon.geometry.coordinates[0];
+      // Tạo circle bán kính 10m xung quanh điểm được chọn
+      const centerPoint = safeCreatePoint(lng, lat);
+      const options = { steps: 32, units: 'meters' as const };
+      const circlePolygon = circle(centerPoint, 10, options); // 10m bán kính
 
-    draw.current.deleteAll();
-    const feature = {
-      type: 'Feature',
-      geometry: {
-        type: 'Polygon',
-        coordinates: [polygonCoords]
-      },
-      properties: {},
-      id: undefined
-    };
-    draw.current.add(feature as any);
+      const polygonCoords = circlePolygon.geometry.coordinates[0];
 
-    const turfPolygon = polygon([polygonCoords]);
-    const areaValue = area(turfPolygon);
-    const bearingValue = bearing(
-      point(polygonCoords[0]),
-      point(polygonCoords[1])
-    );
-    const orientation = getOrientation(bearingValue);
+      draw.current.deleteAll();
+      const feature = {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [polygonCoords]
+        },
+        properties: {},
+        id: undefined
+      };
+      draw.current.add(feature as any);
 
-    setCurrentCenter({ lat, lng });
+      const turfPolygon = polygon([polygonCoords]);
+      const areaValue = area(turfPolygon);
+      const bearingValue = bearing(
+        safeCreatePoint(polygonCoords[0][0], polygonCoords[0][1]),
+        safeCreatePoint(polygonCoords[1][0], polygonCoords[1][1])
+      );
+      const orientation = getOrientation(bearingValue);
 
-    onPolygonChange?.({
-      coordinates: polygonCoords,
-      area: Math.round(areaValue),
-      orientation,
-      frontageCount: 4,
-      center: { lat, lng }
-    });
+      setCurrentCenter({ lat, lng });
+
+      onPolygonChange?.({
+        coordinates: polygonCoords,
+        area: Math.round(areaValue),
+        orientation,
+        frontageCount: 4,
+        center: { lat, lng }
+      });
+    } catch (error) {
+      console.error('Error in handleSearchSelect:', error);
+      // Optionally show user-friendly error message
+    }
   };
 
   useEffect(() => {
@@ -225,8 +278,8 @@ export default function MapView({
     const geolocateControl = new mapboxgl.GeolocateControl({
       positionOptions: {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        timeout: 30000, // Increased timeout for better reliability
+        maximumAge: 60000 // Allow cached positions for 1 minute
       },
       trackUserLocation: true,
       showUserHeading: true
@@ -241,51 +294,61 @@ export default function MapView({
         const { latitude, longitude } = e.coords;
         console.log('Location found:', latitude, longitude);
 
+        // Validate coordinates from geolocation
+        if (!isValidCoordinate(longitude, latitude)) {
+          console.error('Invalid coordinates from geolocation:', [longitude, latitude]);
+          return;
+        }
+
         // Auto-create 10m radius area around user's location
         if (draw.current && map.current) {
-          // Center map on user location with appropriate zoom
-          map.current.flyTo({
-            center: [longitude, latitude],
-            zoom: 18,
-            duration: 1500
-          });
+          try {
+            // Center map on user location with appropriate zoom
+            map.current.flyTo({
+              center: [longitude, latitude],
+              zoom: 18,
+              duration: 1500
+            });
 
-          // Create 10m radius circle around user location
-          const centerPoint = point([longitude, latitude]);
-          const options = { steps: 32, units: 'meters' as const };
-          const circlePolygon = circle(centerPoint, 10, options); // 10m radius
+            // Create 10m radius circle around user location
+            const centerPoint = safeCreatePoint(longitude, latitude);
+            const options = { steps: 32, units: 'meters' as const };
+            const circlePolygon = circle(centerPoint, 10, options); // 10m radius
 
-          const polygonCoords = circlePolygon.geometry.coordinates[0];
+            const polygonCoords = circlePolygon.geometry.coordinates[0];
 
-          draw.current.deleteAll();
-          const feature = {
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: [polygonCoords]
-            },
-            properties: {},
-            id: undefined
-          };
-          draw.current.add(feature as any);
+            draw.current.deleteAll();
+            const feature = {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [polygonCoords]
+              },
+              properties: {},
+              id: undefined
+            };
+            draw.current.add(feature as any);
 
-          const turfPolygon = polygon([polygonCoords]);
-          const areaValue = area(turfPolygon);
-          const bearingValue = bearing(
-            point(polygonCoords[0]),
-            point(polygonCoords[1])
-          );
-          const orientation = getOrientation(bearingValue);
+            const turfPolygon = polygon([polygonCoords]);
+            const areaValue = area(turfPolygon);
+            const bearingValue = bearing(
+              safeCreatePoint(polygonCoords[0][0], polygonCoords[0][1]),
+              safeCreatePoint(polygonCoords[1][0], polygonCoords[1][1])
+            );
+            const orientation = getOrientation(bearingValue);
 
-          setCurrentCenter({ lat: latitude, lng: longitude });
+            setCurrentCenter({ lat: latitude, lng: longitude });
 
-          onPolygonChange?.({
-            coordinates: polygonCoords,
-            area: Math.round(areaValue),
-            orientation,
-            frontageCount: 4,
-            center: { lat: latitude, lng: longitude }
-          });
+            onPolygonChange?.({
+              coordinates: polygonCoords,
+              area: Math.round(areaValue),
+              orientation,
+              frontageCount: 4,
+              center: { lat: latitude, lng: longitude }
+            });
+          } catch (error) {
+            console.error('Error creating polygon from geolocation:', error);
+          }
         }
       }
     });
@@ -428,25 +491,42 @@ export default function MapView({
         const polygonFeature = data.features[0];
         if (polygonFeature.geometry.type === 'Polygon') {
           const coords = polygonFeature.geometry.coordinates[0];
-          const turfPolygon = polygon([coords]);
-          const areaValue = area(turfPolygon);
-          const bearingValue = bearing(
-            point(coords[0]),
-            point(coords[1])
-          );
-          const orientation = getOrientation(bearingValue);
-          const centerPoint = centroid(turfPolygon);
-          const [lng, lat] = centerPoint.geometry.coordinates;
 
-          setCurrentCenter({ lat, lng });
+          // Validate coordinate array
+          if (!isValidCoordinateArray(coords)) {
+            console.error('Invalid coordinates in polygon:', coords);
+            return;
+          }
 
-          onPolygonChange?.({
-            coordinates: coords,
-            area: Math.round(areaValue),
-            orientation,
-            frontageCount: coords.length - 1,
-            center: { lat, lng }
-          });
+          try {
+            const turfPolygon = polygon([coords]);
+            const areaValue = area(turfPolygon);
+            const bearingValue = bearing(
+              safeCreatePoint(coords[0][0], coords[0][1]),
+              safeCreatePoint(coords[1][0], coords[1][1])
+            );
+            const orientation = getOrientation(bearingValue);
+            const centerPoint = centroid(turfPolygon);
+            const [lng, lat] = centerPoint.geometry.coordinates;
+
+            // Validate center coordinates
+            if (!isValidCoordinate(lng, lat)) {
+              console.error('Invalid center coordinates:', [lng, lat]);
+              return;
+            }
+
+            setCurrentCenter({ lat, lng });
+
+            onPolygonChange?.({
+              coordinates: coords,
+              area: Math.round(areaValue),
+              orientation,
+              frontageCount: coords.length - 1,
+              center: { lat, lng }
+            });
+          } catch (error) {
+            console.error('Error in updatePolygon:', error);
+          }
         }
       }
     }
@@ -620,6 +700,12 @@ export default function MapView({
     );
 
     filteredAmenities.forEach(amenity => {
+      // Validate amenity coordinates before creating marker
+      if (!isValidCoordinate(amenity.lng, amenity.lat)) {
+        console.error('Invalid amenity coordinates:', amenity.name, [amenity.lng, amenity.lat]);
+        return;
+      }
+
       const el = document.createElement('div');
       el.className = 'amenity-marker';
       el.style.width = '32px';
@@ -634,7 +720,7 @@ export default function MapView({
       el.style.cursor = 'pointer';
       el.style.border = '2px solid white';
       el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-      
+
       let icon = categoryIcons[amenity.category] || categoryIcons.default;
       if (amenity.category === 'transport' && amenity.type) {
         icon = transportTypeIcons[amenity.type] || transportTypeIcons.default;
@@ -646,7 +732,7 @@ export default function MapView({
         educationType = getEducationTypeLabel(amenity);
         console.log('Education amenity:', amenity.name, 'Tags:', amenity.tags, 'Type:', educationType);
       }
-      
+
       const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
         <div style="padding:8px;">
           <strong style="font-size:14px;">${amenity.name}</strong>
@@ -662,12 +748,16 @@ export default function MapView({
         </div>
       `);
 
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([amenity.lng, amenity.lat])
-        .setPopup(popup)
-        .addTo(map.current!);
+      try {
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([amenity.lng, amenity.lat])
+          .setPopup(popup)
+          .addTo(map.current!);
 
-      markersRef.current.push(marker);
+        markersRef.current.push(marker);
+      } catch (error) {
+        console.error('Error creating marker for amenity:', amenity.name, error);
+      }
     });
   }, [amenities, selectedCategories, isLoaded, styleLoaded]);
 
@@ -680,90 +770,121 @@ export default function MapView({
       return;
     }
 
-    // Check if we have permission
-    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-      if (result.state === 'denied') {
-        alert('Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt');
-        return;
-      }
+    const attemptGeolocation = (attemptNumber: number = 1) => {
+      console.log(`Geolocation attempt ${attemptNumber}`);
 
-      // Request current position
+      // Request current position with retry logic
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          console.log('Fallback location found:', latitude, longitude);
+          console.log(`Fallback location found (attempt ${attemptNumber}):`, latitude, longitude);
 
-          // Center map on user location
-          map.current!.flyTo({
-            center: [longitude, latitude],
-            zoom: 18,
-            duration: 1500
-          });
+          // Validate coordinates from geolocation
+          if (!isValidCoordinate(longitude, latitude)) {
+            console.error('Invalid coordinates from geolocation fallback:', [longitude, latitude]);
+            return;
+          }
 
-          // Create 10m radius circle around user location
-          const centerPoint = point([longitude, latitude]);
-          const options = { steps: 32, units: 'meters' as const };
-          const circlePolygon = circle(centerPoint, 10, options); // 10m radius
+          try {
+            // Center map on user location
+            map.current!.flyTo({
+              center: [longitude, latitude],
+              zoom: 18,
+              duration: 1500
+            });
 
-          const polygonCoords = circlePolygon.geometry.coordinates[0];
+            // Create 10m radius circle around user location
+            const centerPoint = safeCreatePoint(longitude, latitude);
+            const options = { steps: 32, units: 'meters' as const };
+            const circlePolygon = circle(centerPoint, 10, options); // 10m radius
 
-          draw.current!.deleteAll();
-          const feature = {
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: [polygonCoords]
-            },
-            properties: {},
-            id: undefined
-          };
-          draw.current!.add(feature as any);
+            const polygonCoords = circlePolygon.geometry.coordinates[0];
 
-          const turfPolygon = polygon([polygonCoords]);
-          const areaValue = area(turfPolygon);
-          const bearingValue = bearing(
-            point(polygonCoords[0]),
-            point(polygonCoords[1])
-          );
-          const orientation = getOrientation(bearingValue);
+            draw.current!.deleteAll();
+            const feature = {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [polygonCoords]
+              },
+              properties: {},
+              id: undefined
+            };
+            draw.current!.add(feature as any);
 
-          setCurrentCenter({ lat: latitude, lng: longitude });
+            const turfPolygon = polygon([polygonCoords]);
+            const areaValue = area(turfPolygon);
+            const bearingValue = bearing(
+              safeCreatePoint(polygonCoords[0][0], polygonCoords[0][1]),
+              safeCreatePoint(polygonCoords[1][0], polygonCoords[1][1])
+            );
+            const orientation = getOrientation(bearingValue);
 
-          onPolygonChange?.({
-            coordinates: polygonCoords,
-            area: Math.round(areaValue),
-            orientation,
-            frontageCount: 4,
-            center: { lat: latitude, lng: longitude }
-          });
+            setCurrentCenter({ lat: latitude, lng: longitude });
+
+            onPolygonChange?.({
+              coordinates: polygonCoords,
+              area: Math.round(areaValue),
+              orientation,
+              frontageCount: 4,
+              center: { lat: latitude, lng: longitude }
+            });
+          } catch (error) {
+            console.error('Error creating polygon from geolocation fallback:', error);
+          }
         },
         (error) => {
-          console.error('Geolocation error:', error);
-          let errorMessage = 'Không thể xác định vị trí của bạn. ';
+          console.error(`Geolocation error (attempt ${attemptNumber}):`, error);
+
+          // Retry on timeout up to 3 times
+          if (error.code === error.TIMEOUT && attemptNumber < 3) {
+            console.log('Timeout occurred, retrying...');
+            setTimeout(() => attemptGeolocation(attemptNumber + 1), 2000); // Wait 2 seconds before retry
+            return;
+          }
+
+          let errorMessage = `Không thể xác định vị trí của bạn (thử ${attemptNumber}/3). `;
 
           switch(error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage += 'Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt và macOS System Preferences.';
+              errorMessage += 'Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt và macOS System Preferences > Security & Privacy > Location Services.';
               break;
             case error.POSITION_UNAVAILABLE:
-              errorMessage += 'Thông tin vị trí không có sẵn.';
+              errorMessage += 'Thông tin vị trí không có sẵn. Vui lòng kiểm tra GPS/WiFi.';
               break;
             case error.TIMEOUT:
-              errorMessage += 'Hết thời gian chờ định vị vị trí.';
+              errorMessage += 'Hết thời gian chờ định vị vị trí. Vui lòng thử lại hoặc kiểm tra kết nối internet.';
               break;
+          }
+
+          // Suggest alternatives for macOS
+          if (navigator.platform && navigator.platform.includes('Mac')) {
+            errorMessage += '\n\nGợi ý cho macOS:\n- Kiểm tra System Preferences > Security & Privacy > Location Services\n- Thử dùng WiFi thay vì chỉ dùng Ethernet\n- Di chuyển đến nơi có tín hiệu GPS tốt hơn';
           }
 
           alert(errorMessage);
         },
         {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
+          enableHighAccuracy: attemptNumber === 1, // Use high accuracy only on first attempt
+          timeout: attemptNumber === 1 ? 30000 : 20000, // Shorter timeout for retries
+          maximumAge: attemptNumber === 1 ? 60000 : 300000 // Allow older cached positions for retries
         }
       );
+    };
+
+    // Check if we have permission first
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      if (result.state === 'denied') {
+        alert('Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt và macOS System Preferences > Security & Privacy > Location Services.');
+        return;
+      }
+
+      // Start geolocation attempts
+      attemptGeolocation();
     }).catch((error) => {
       console.error('Permission query error:', error);
-      alert('Lỗi khi kiểm tra quyền truy cập vị trí');
+      // Proceed with geolocation anyway as permission check failed
+      attemptGeolocation();
     });
   };
 
