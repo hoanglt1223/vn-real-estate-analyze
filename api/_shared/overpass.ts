@@ -205,9 +205,9 @@ export async function fetchAmenities(
       includeSmallShops
     });
 
-    let categoryAmenities: any[] = localCache.get(categoryCacheKey) as any[] || [];
+    let categoryAmenities: any[] = localCache.get(categoryCacheKey) as any[];
 
-    if (!categoryAmenities) {
+    if (!categoryAmenities || categoryAmenities.length === 0) {
       categoryAmenities = [];
       // Fetch from Overpass API
       try {
@@ -421,12 +421,29 @@ function isNotablePlace(tags: any, category: string, includeSmallShops: boolean 
     return true;
   }
 
+  // Education - include ALL educational institutions without requiring names
+  if (category === 'education') {
+    if (tags.amenity === 'university' || tags.amenity === 'college' ||
+        tags.amenity === 'school' || tags.amenity === 'kindergarten' || tags.amenity === 'library') {
+      return true;
+    }
+  }
+
+  // Healthcare - include ALL medical facilities without requiring names
+  if (category === 'healthcare') {
+    if (tags.amenity === 'hospital' || tags.healthcare === 'hospital' ||
+        tags.amenity === 'clinic' || tags.amenity === 'doctors' ||
+        tags.amenity === 'dentist' || tags.amenity === 'pharmacy') {
+      return true;
+    }
+  }
+
   // Transport hubs are always notable
   if (category === 'transport') {
     if (tags.aeroway === 'aerodrome') return true;
     if (tags.railway === 'station') return true;
     if (tags.amenity === 'bus_station') return true;
-    if (tags.highway === 'bus_stop' && (tags.name || tags.operator)) return true;
+    if (tags.highway === 'bus_stop') return true; // Remove name requirement
   }
 
   // Shopping - include major retailers
@@ -436,22 +453,10 @@ function isNotablePlace(tags: any, category: string, includeSmallShops: boolean 
     if (includeSmallShops && tags.shop) return true;
   }
 
-  // Healthcare - include all medical facilities
-  if (category === 'healthcare') {
-    if (tags.amenity === 'hospital' || tags.healthcare === 'hospital') return true;
-    if (tags.amenity === 'clinic' || tags.amenity === 'doctors' || tags.amenity === 'dentist') return true;
-    if (tags.amenity === 'pharmacy') return true;
-  }
-
-  // Education - include all educational institutions
-  if (category === 'education') {
-    if (tags.amenity === 'university' || tags.amenity === 'college') return true;
-    if (tags.amenity === 'school' || tags.amenity === 'kindergarten' || tags.amenity === 'library') return true;
-  }
-
   // Entertainment and food
   if (category === 'entertainment') {
-    if (tags.amenity === 'cinema' || tags.amenity === 'theatre' || tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food') return true;
+    if (tags.amenity === 'cinema' || tags.amenity === 'theatre' ||
+        tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food') return true;
     if (tags.leisure === 'stadium' || tags.leisure === 'sports_centre' || tags.leisure === 'fitness_centre') return true;
     if (tags.leisure === 'park' || tags.leisure === 'garden') return true;
     if (tags.tourism === 'hotel' || tags.tourism === 'museum' || tags.tourism === 'gallery') return true;
