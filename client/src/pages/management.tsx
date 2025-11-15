@@ -479,8 +479,8 @@ const currentProperties = isSearchMode ? searchResults : properties;
               <div className="space-y-2">
                 <Label htmlFor="propertyType">Loại bất động sản</Label>
                 <Select
-                  value={editingProperty.propertyType || ''}
-                  onValueChange={(value) => setEditingProperty({ ...editingProperty, propertyType: value })}
+                  value={editingProperty.propertyType || undefined}
+                  onValueChange={(value) => setEditingProperty({ ...editingProperty, propertyType: value || null })}
                 >
                   <SelectTrigger id="propertyType" data-testid="select-property-type">
                     <SelectValue placeholder="Chọn loại" />
