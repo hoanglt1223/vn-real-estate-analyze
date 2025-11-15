@@ -54,111 +54,156 @@ export async function scrapeMarketPrices(
   lng: number,
   radius: number
 ): Promise<MarketPriceData> {
-  // Generate cache key based on location and radius
-  const cacheKey = generateCacheKey('marketPrices', {
-    lat: lat.toFixed(4),
-    lng: lng.toFixed(4),
-    radius
-  });
+  try {
+    console.log(`Starting market price scraping for lat: ${lat}, lng: ${lng}, radius: ${radius}m`);
 
-  // Try to get from cache first
-  const cachedResult = cache.get(cacheKey);
-  if (cachedResult) {
-    console.log(`Cache hit for market prices: ${cacheKey}`);
-    // Update lastUpdated to current time to keep data fresh
-    return {
-      ...cachedResult,
-      lastUpdated: new Date()
-    } as MarketPriceData;
-  }
-
-  console.log(`Cache miss for market prices: ${cacheKey}`);
-
-  // Try to fetch from multiple sources in parallel
-  const [batdongsanData, chototData] = await Promise.allSettled([
-    fetchFromBatdongsan(lat, lng, radius),
-    fetchFromChotot(lat, lng, radius)
-  ]);
-
-  // Combine results from all sources
-  const allListings: PriceListing[] = [];
-  const sources: Array<{ name: string; type: string; listingCount?: number }> = [];
-
-  if (batdongsanData.status === 'fulfilled' && batdongsanData.value.listings.length > 0) {
-    allListings.push(...batdongsanData.value.listings);
-    sources.push({
-      name: 'Batdongsan.com.vn',
-      type: 'real_estate_portal',
-      listingCount: batdongsanData.value.listings.length
+    // Generate cache key based on location and radius
+    const cacheKey = generateCacheKey('marketPrices', {
+      lat: lat.toFixed(4),
+      lng: lng.toFixed(4),
+      radius
     });
+
+    // Try to get from cache first
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult) {
+      console.log(`Cache hit for market prices: ${cacheKey}`);
+      // Update lastUpdated to current time to keep data fresh
+      return {
+        ...cachedResult,
+        lastUpdated: new Date()
+      } as MarketPriceData;
+    }
+
+    console.log(`Cache miss for market prices: ${cacheKey}`);
+
+    // Try to fetch from multiple sources in parallel with error handling
+    const [batdongsanData, chototData] = await Promise.allSettled([
+      fetchFromBatdongsan(lat, lng, radius).catch(err => {
+        console.warn('Batdongsan fetch failed, returning empty:', err.message);
+        return { listings: [] };
+      }),
+      fetchFromChotot(lat, lng, radius).catch(err => {
+        console.warn('Chotot fetch failed, returning empty:', err.message);
+        return { listings: [] };
+      })
+    ]);
+
+    // Combine results from all sources
+    const allListings: PriceListing[] = [];
+    const sources: Array<{ name: string; type: string; listingCount?: number }> = [];
+
+    if (batdongsanData.status === 'fulfilled' && batdongsanData.value?.listings?.length > 0) {
+      allListings.push(...batdongsanData.value.listings);
+      sources.push({
+        name: 'Batdongsan.com.vn',
+        type: 'real_estate_portal',
+        listingCount: batdongsanData.value.listings.length
+      });
+    }
+
+    if (chototData.status === 'fulfilled' && chototData.value?.listings?.length > 0) {
+      allListings.push(...chototData.value.listings);
+      sources.push({
+        name: 'Chotot.com',
+        type: 'marketplace',
+        listingCount: chototData.value.listings.length
+      });
+    }
+
+    let result: MarketPriceData;
+
+    // If no real data available, fall back to estimated data (serverless-friendly)
+    if (allListings.length === 0) {
+      console.log('No real data available, using estimated data');
+      const estimated = generateEstimatedPrices(lat, lng, radius);
+      const priceHistory = generatePriceHistory(lat, lng, estimated.avg, Math.round(estimated.avg / 100), estimated.listingCount);
+      const priceTrends = analyzePriceTrends(priceHistory, estimated.avg, calculateBasePriceForLocation(lat, lng));
+      result = {
+        ...estimated,
+        priceHistory,
+        priceTrends
+      };
+    } else {
+      console.log(`Found ${allListings.length} real listings`);
+      // Calculate statistics from real listings
+      const prices = allListings.map(l => l.price).sort((a, b) => a - b);
+      const pricesPerSqm = allListings.map(l => l.pricePerSqm).filter(p => p > 0);
+
+      const min = prices[0];
+      const max = prices[prices.length - 1];
+      const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+      const median = prices[Math.floor(prices.length / 2)];
+      const avgPerSqm = pricesPerSqm.length > 0
+        ? Math.round(pricesPerSqm.reduce((a, b) => a + b, 0) / pricesPerSqm.length)
+        : Math.round(avg / 100);
+
+      const basePrice = calculateBasePriceForLocation(lat, lng);
+      const trend = determineTrend(avg, basePrice);
+
+      // Generate price history and trend analysis
+      const priceHistory = generatePriceHistory(lat, lng, avg, avgPerSqm, allListings.length);
+      const priceTrends = analyzePriceTrends(priceHistory, avg, basePrice);
+
+      result = {
+        min,
+        avg,
+        max,
+        median,
+        listingCount: allListings.length,
+        trend,
+        pricePerSqm: avgPerSqm,
+        sources,
+        listings: allListings.slice(0, 20), // Return top 20 listings
+        lastUpdated: new Date(),
+        priceHistory,
+        priceTrends
+      };
+    }
+
+    // Cache the result with medium TTL since market data changes moderately
+    cache.set(cacheKey, result, CACHE_TTL.MARKET_PRICES);
+
+    return result;
+
+  } catch (error) {
+    console.error('Critical error in scrapeMarketPrices, falling back to estimated data:', error);
+
+    // Always return valid data, never throw
+    try {
+      const estimated = generateEstimatedPrices(lat, lng, radius);
+      const priceHistory = generatePriceHistory(lat, lng, estimated.avg, Math.round(estimated.avg / 100), estimated.listingCount);
+      const priceTrends = analyzePriceTrends(priceHistory, estimated.avg, calculateBasePriceForLocation(lat, lng));
+
+      return {
+        ...estimated,
+        priceHistory,
+        priceTrends,
+        sources: [{ name: 'Dữ liệu ước tính (Lỗi scrap)', type: 'estimated_fallback' }]
+      };
+    } catch (fallbackError) {
+      console.error('Even fallback failed, returning minimal data:', fallbackError);
+
+      // Last resort - return minimal valid data
+      const basePrice = calculateBasePriceForLocation(lat, lng);
+      return {
+        min: Math.round(basePrice * 0.8),
+        avg: Math.round(basePrice),
+        max: Math.round(basePrice * 1.2),
+        median: Math.round(basePrice),
+        listingCount: 0,
+        trend: 'stable',
+        pricePerSqm: Math.round(basePrice / 100),
+        sources: [{ name: 'Dữ liệu tối thiểu', type: 'minimal_fallback' }],
+        lastUpdated: new Date()
+      };
+    }
   }
-
-  if (chototData.status === 'fulfilled' && chototData.value.listings.length > 0) {
-    allListings.push(...chototData.value.listings);
-    sources.push({
-      name: 'Chotot.com',
-      type: 'marketplace',
-      listingCount: chototData.value.listings.length
-    });
-  }
-
-  let result: MarketPriceData;
-
-  // If no real data available, fall back to estimated data (serverless-friendly)
-  if (allListings.length === 0) {
-    const estimated = generateEstimatedPrices(lat, lng, radius);
-    const priceHistory = generatePriceHistory(lat, lng, estimated.avg, Math.round(estimated.avg / 100), estimated.listingCount);
-    const priceTrends = analyzePriceTrends(priceHistory, estimated.avg, calculateBasePriceForLocation(lat, lng));
-    result = {
-      ...estimated,
-      priceHistory,
-      priceTrends
-    };
-  } else {
-    // Calculate statistics from real listings
-    const prices = allListings.map(l => l.price).sort((a, b) => a - b);
-    const pricesPerSqm = allListings.map(l => l.pricePerSqm).filter(p => p > 0);
-
-    const min = prices[0];
-    const max = prices[prices.length - 1];
-    const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
-    const median = prices[Math.floor(prices.length / 2)];
-    const avgPerSqm = pricesPerSqm.length > 0
-      ? Math.round(pricesPerSqm.reduce((a, b) => a + b, 0) / pricesPerSqm.length)
-      : Math.round(avg / 100);
-
-    const basePrice = calculateBasePriceForLocation(lat, lng);
-    const trend = determineTrend(avg, basePrice);
-
-    // Generate price history and trend analysis
-    const priceHistory = generatePriceHistory(lat, lng, avg, avgPerSqm, allListings.length);
-    const priceTrends = analyzePriceTrends(priceHistory, avg, basePrice);
-
-    result = {
-      min,
-      avg,
-      max,
-      median,
-      listingCount: allListings.length,
-      trend,
-      pricePerSqm: avgPerSqm,
-      sources,
-      listings: allListings.slice(0, 20), // Return top 20 listings
-      lastUpdated: new Date(),
-      priceHistory,
-      priceTrends
-    };
-  }
-
-  // Cache the result with medium TTL since market data changes moderately
-  cache.set(cacheKey, result, CACHE_TTL.MARKET_PRICES);
-
-  return result;
 }
 
 export async function fetchFromBatdongsan(lat: number, lng: number, radius: number): Promise<{ listings: PriceListing[] }> {
   try {
-    console.log('Fetching real data from Batdongsan.com.vn directly...');
+    console.log('Fetching data from Batdongsan.com.vn...');
 
     // Determine location URL based on coordinates
     const locationSlug = determineLocationSlug(lat, lng);
@@ -172,19 +217,21 @@ export async function fetchFromBatdongsan(lat: number, lng: number, radius: numb
     let finalListings = listings;
 
     if (listings.length === 0) {
-      console.log('No listings found, falling back to alternative approach...');
+      console.log('No listings found, trying alternative approach...');
       // Try alternative URL pattern
       const altUrl = `https://batdongsan.com.vn/nha-dat-ban/${locationSlug}?p=1`;
-      const altListings = await fetchBatdongsanDirectly(altUrl);
-      finalListings = altListings;
+      try {
+        const altListings = await fetchBatdongsanDirectly(altUrl);
+        finalListings = altListings;
+      } catch (altError) {
+        console.log('Alternative URL also failed:', altError.message);
+      }
     }
 
     if (finalListings.length === 0) {
-      console.log('Direct scraping failed, generating realistic fallback data...');
-      // Generate realistic mock data when scraping fails
-      const mockData = generateMockListings('batdongsan', lat, lng, radius, 8);
-      finalListings = mockData.listings;
-      console.log(`Generated ${finalListings.length} realistic fallback listings`);
+      console.log('Scraping failed, returning empty data...');
+      // Return empty instead of mock data to avoid fake data
+      return { listings: [] };
     }
 
     console.log(`Successfully fetched ${finalListings.length} listings from Batdongsan.com.vn`);
@@ -196,10 +243,9 @@ export async function fetchFromBatdongsan(lat: number, lng: number, radius: numb
     return { listings: filteredListings };
 
   } catch (error) {
-    console.error('Batdongsan direct scraper error:', error);
-    console.log('Generating fallback data due to error...');
-    const mockData = generateMockListings('batdongsan', lat, lng, radius, 8);
-    return { listings: mockData.listings };
+    console.warn('Batdongsan scraper error:', error instanceof Error ? error.message : 'Unknown error');
+    // Always return valid structure, never throw
+    return { listings: [] };
   }
 }
 
@@ -612,15 +658,20 @@ async function fetchFromChotot(lat: number, lng: number, radius: number): Promis
         }
 
       } catch (error) {
-        console.log(`Error with ${url}:`, error.message);
+        console.log(`Error with ${url}:`, error instanceof Error ? error.message : 'Unknown error');
         continue;
       }
+    }
+
+    if (listings.length === 0) {
+      console.log('No listings found from any Chotot URLs');
     }
 
     return { listings };
 
   } catch (error) {
-    console.error('Error fetching from Chotot.com:', error);
+    console.warn('Error fetching from Chotot.com:', error instanceof Error ? error.message : 'Unknown error');
+    // Always return valid structure, never throw
     return { listings: [] };
   }
 }

@@ -10,10 +10,10 @@
 - [ ] Resolve schema inconsistencies between two schema files
 
 ### 2. Market Data Real Implementation
-- [ ] Implement real scraper cho Batdongsan.com.vn
-- [ ] Implement scraper cho Chotot
-- [ ] Parse và aggregate pricing data
-- [ ] Show price trends over time
+- [x] Implement real scraper cho Batdongsan.com.vn
+- [x] Implement scraper cho Chotot
+- [x] Parse và aggregate pricing data
+- [x] Show price trends over time
 
 ---
 
@@ -26,17 +26,17 @@
 - [x] Optimize API response size
 
 ### 5. Map Enhancements
-- [ ] Thêm marker clustering cho nhiều amenities
+- [x] Thêm marker clustering cho nhiều amenities
 - [ ] Thêm heatmap layer cho mật độ tiện ích
 - [ ] 3D buildings layer (Mapbox feature)
-- [ ] Custom marker icons cho từng loại amenity
+- [x] Custom marker icons cho từng loại amenity
 
 ### 6. PDF Export Enhancement
-- [ ] Capture map với tất cả markers visible
-- [ ] Thêm charts/graphs vào PDF
-- [ ] Format đẹp hơn với colors và icons
-- [ ] Compress PDF size
-- [ ] Watermark với logo/branding
+- [x] Capture map với tất cả markers visible
+- [x] Thêm charts/graphs vào PDF
+- [x] Format đẹp hơn với colors và icons
+- [x] Compress PDF size
+- [x] Watermark với logo/branding
 
 ### 7. AI Analysis Deep Dive
 - [ ] Explain why each amenity matters
@@ -56,7 +56,7 @@
 - [ ] Future development plans overlay
 
 ### 9. UI/UX Polish
-- [ ] Responsive design cho mobile/tablet
+- [x] Responsive design cho mobile/tablet
 - [ ] Better loading states với skeletons
 - [ ] Animations cho map transitions
 - [ ] Onboarding tutorial cho new users
@@ -261,3 +261,17 @@
 - ✅ Added shared data processing utilities for common operations
 - ✅ Created comprehensive validation schemas and utilities
 - ✅ Unified geocoding services with consistent caching strategy
+
+### Recent Updates (Nov 15, 2025)
+- ✅ Enhanced market data scrapers for Batdongsan.com.vn and Chotot.com
+- ✅ Improved error handling - scrapers return empty data instead of crashing
+- ✅ Added multiple URL patterns and fallback mechanisms
+- ✅ Implemented marker clustering with supercluster for better performance
+- ✅ Created MarkerCluster component with custom icons and colors
+- ✅ Enhanced PDF export with high-quality map captures and score charts
+- ✅ Added watermark, footer, and professional formatting to PDF reports
+- ✅ Implemented mobile responsive design with floating action button
+- ✅ Added mobile filters overlay with smooth animations
+- ✅ Improved mobile UX with truncated text and responsive buttons
+- ✅ Added comprehensive error handling that never fails the application
+- ✅ All critical features now have robust fallback mechanisms

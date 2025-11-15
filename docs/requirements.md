@@ -397,12 +397,12 @@ Format JSON theo schema đã định.
 - [ ] Statistics dashboard
 - [ ] Infrastructure layer overlays
 
-### **Phase 3: Market Data** 🔴 TODO
-- [ ] Batdongsan scraper
-- [ ] Chotot scraper  
-- [ ] Data parsing & storage
-- [ ] Price heatmap
-- [ ] Comparable listings table
+### **Phase 3: Market Data** ✅ COMPLETED
+- [x] Batdongsan scraper
+- [x] Chotot scraper
+- [x] Data parsing & storage
+- [x] Price heatmap
+- [x] Comparable listings table
 
 ### **Phase 4: AI Analysis** ✅
 - [x] OpenAI integration
@@ -418,8 +418,8 @@ Format JSON theo schema đã định.
 - [ ] Beautiful formatting
 - [ ] Vietnamese font
 
-### **Phase 6: Polish & Deploy** 🔴 TODO
-- [ ] Responsive mobile UI
+### **Phase 6: Polish & Deploy** 🟡 IN PROGRESS
+- [x] Responsive mobile UI
 - [ ] Loading states & error handling
 - [ ] Performance optimization
 - [ ] SEO optimization
@@ -553,7 +553,7 @@ Response: Market price data
 - [ ] Infrastructure layers toggle on/off
 - [ ] AI analysis có ý nghĩa
 - [ ] PDF export đầy đủ và đẹp
-- [ ] Mobile responsive
+- [x] Mobile responsive
 - [ ] Cross-browser (Chrome, Safari, Firefox)
 
 ---
