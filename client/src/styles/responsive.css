@@ -1,0 +1,240 @@
+/* Global Responsive Styles - 2 Breakpoint System */
+/* Mobile: <1024px, Desktop: >=1024px */
+
+/* Base responsive typography */
+.text-mobile-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.text-mobile-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.text-mobile-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.text-mobile-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+/* Desktop typography */
+@media (min-width: 1024px) {
+  .text-mobile-xs {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .text-mobile-sm {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+
+  .text-mobile-base {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+
+  .text-mobile-lg {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+}
+
+/* Base responsive spacing */
+.p-mobile-sm {
+  padding: 0.5rem;
+}
+
+.p-mobile-md {
+  padding: 0.75rem;
+}
+
+.p-mobile-lg {
+  padding: 1rem;
+}
+
+/* Desktop spacing */
+@media (min-width: 1024px) {
+  .p-mobile-sm {
+    padding: 1rem;
+  }
+
+  .p-mobile-md {
+    padding: 1.5rem;
+  }
+
+  .p-mobile-lg {
+    padding: 2rem;
+  }
+}
+
+/* Sidebar widths */
+.sidebar-mobile {
+  width: 16rem;
+}
+
+.sidebar-desktop {
+  width: 20rem;
+}
+
+.sidebar-desktop-xl {
+  width: 24rem;
+}
+
+@media (min-width: 1280px) {
+  .sidebar-desktop {
+    width: 24rem;
+  }
+
+  .sidebar-desktop-xl {
+    width: 24rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .sidebar-desktop {
+    width: 28rem;
+  }
+
+  .sidebar-desktop-xl {
+    width: 28rem;
+  }
+}
+
+/* Card responsive patterns */
+.card-mobile {
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+}
+
+.card-desktop {
+  padding: 1.5rem;
+  border-radius: 0.5625rem;
+}
+
+@media (min-width: 1024px) {
+  .card-mobile {
+    padding: 1.5rem;
+  }
+}
+
+/* Button responsive patterns */
+.btn-mobile-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  height: 1.75rem;
+}
+
+.btn-mobile-md {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  height: 2.25rem;
+}
+
+@media (min-width: 1024px) {
+  .btn-mobile-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    height: 2rem;
+  }
+
+  .btn-mobile-md {
+    padding: 0.625rem 1.25rem;
+    font-size: 1rem;
+    height: 2.5rem;
+  }
+}
+
+/* Icon responsive sizes */
+.icon-mobile-xs {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.icon-mobile-sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+.icon-mobile-md {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .icon-mobile-xs {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .icon-mobile-sm {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .icon-mobile-md {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+/* Layout utilities */
+.container-responsive {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+@media (min-width: 1024px) {
+  .container-responsive {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* Hide/Show utilities */
+.mobile-only {
+  display: block;
+}
+
+.desktop-only {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .mobile-only {
+    display: none;
+  }
+
+  .desktop-only {
+    display: block;
+  }
+}
+
+/* Sidebar specific responsive classes */
+.sidebar-mobile-only {
+  display: block;
+  position: absolute;
+  z-index: 100;
+  background: white;
+}
+
+.sidebar-desktop-only {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .sidebar-mobile-only {
+    display: none;
+  }
+
+  .sidebar-desktop-only {
+    display: block;
+    position: relative;
+    z-index: auto;
+  }
+}

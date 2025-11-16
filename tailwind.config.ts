@@ -4,6 +4,13 @@ export default {
   darkMode: ["class"],
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
+    screens: {
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
+    },
     extend: {
       borderRadius: {
         lg: ".5625rem", /* 9px */
@@ -101,7 +108,110 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      // Custom responsive utility classes
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
+        '128': '32rem',
+      },
     },
   },
-  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/typography"),
+    // Plugin for custom responsive utilities
+    function({ addUtilities, theme }: any) {
+      const newUtilities = {
+        // Custom responsive patterns for 2-breakpoint system
+        '.mobile-hidden': {
+          display: 'none',
+        },
+        '.mobile-block': {
+          display: 'block',
+        },
+        '.mobile-flex': {
+          display: 'flex',
+        },
+        '.desktop-hidden': {
+          display: 'none',
+        },
+        '.desktop-block': {
+          display: 'block',
+        },
+        '.desktop-flex': {
+          display: 'flex',
+        },
+        // Responsive text sizes
+        '.text-responsive-xs': {
+          fontSize: '0.75rem',
+        },
+        '.text-responsive-sm': {
+          fontSize: '0.875rem',
+        },
+        '.text-responsive-base': {
+          fontSize: '1rem',
+        },
+        '.text-responsive-lg': {
+          fontSize: '1.125rem',
+        },
+        // Responsive padding
+        '.p-responsive-sm': {
+          padding: '0.5rem',
+        },
+        '.p-responsive-md': {
+          padding: '1rem',
+        },
+        '.p-responsive-lg': {
+          padding: '1.5rem',
+        },
+      };
+
+      // Add responsive variants for custom utilities
+      const responsiveUtilities = {
+        '@screen lg': {
+          '.mobile-hidden': {
+            display: 'none',
+          },
+          '.mobile-block': {
+            display: 'none',
+          },
+          '.mobile-flex': {
+            display: 'none',
+          },
+          '.desktop-hidden': {
+            display: 'none',
+          },
+          '.desktop-block': {
+            display: 'block',
+          },
+          '.desktop-flex': {
+            display: 'flex',
+          },
+          '.text-responsive-xs': {
+            fontSize: '0.875rem',
+          },
+          '.text-responsive-sm': {
+            fontSize: '1rem',
+          },
+          '.text-responsive-base': {
+            fontSize: '1.125rem',
+          },
+          '.text-responsive-lg': {
+            fontSize: '1.25rem',
+          },
+          '.p-responsive-sm': {
+            padding: '1rem',
+          },
+          '.p-responsive-md': {
+            padding: '1.5rem',
+          },
+          '.p-responsive-lg': {
+            padding: '2rem',
+          },
+        },
+      };
+
+      addUtilities({ ...newUtilities, ...responsiveUtilities });
+    },
+  ],
 } satisfies Config;
