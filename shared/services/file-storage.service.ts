@@ -93,7 +93,8 @@ export interface SearchResult {
 }
 
 export class FileStorageService {
-  private static readonly DATA_DIR = process.env.DATA_DIR || './data';
+  private static readonly DATA_DIR = process.env.DATA_DIR ||
+    (process.env.NODE_ENV === 'production' ? '/tmp/data' : './data');
   private static readonly CACHE_TTL = 300; // 5 minutes in seconds
 
   // Initialize data directory structure
@@ -106,8 +107,14 @@ export class FileStorageService {
     ];
 
     dirs.forEach(dir => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+      try {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+      } catch (error) {
+        // In Vercel serverless, we might not be able to create directories
+        // This is expected behavior for read-only filesystem
+        console.warn(`Warning: Could not create directory ${dir}:`, error);
       }
     });
   }
@@ -130,12 +137,21 @@ export class FileStorageService {
       favoriteCount: 0
     };
 
-    // Save to file
-    const filePath = path.join(this.DATA_DIR, 'properties', `${id}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(newProperty, null, 2));
+    try {
+      // Save to file
+      const filePath = path.join(this.DATA_DIR, 'properties', `${id}.json`);
+      fs.writeFileSync(filePath, JSON.stringify(newProperty, null, 2));
 
-    // Update search index
-    await this.updateSearchIndex(newProperty);
+      // Update search index
+      try {
+        await this.updateSearchIndex(newProperty);
+      } catch (error) {
+        console.warn('Warning: Could not update search index (KV may not be available):', error);
+      }
+    } catch (error) {
+      console.warn('Warning: Could not save property to file (expected in serverless):', error);
+      // In serverless, we'll store in memory or skip persistence
+    }
 
     return newProperty;
   }
@@ -172,11 +188,20 @@ export class FileStorageService {
       updatedAt: new Date()
     };
 
-    const filePath = path.join(this.DATA_DIR, 'properties', `${id}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(updatedProperty, null, 2));
+    try {
+      const filePath = path.join(this.DATA_DIR, 'properties', `${id}.json`);
+      fs.writeFileSync(filePath, JSON.stringify(updatedProperty, null, 2));
+    } catch (error) {
+      console.warn('Warning: Could not update property file (expected in serverless):', error);
+      // In serverless, we'll continue without file persistence
+    }
 
     // Update search index
-    await this.updateSearchIndex(updatedProperty);
+    try {
+      await this.updateSearchIndex(updatedProperty);
+    } catch (error) {
+      console.warn('Warning: Could not update search index (KV may not be available):', error);
+    }
 
     return updatedProperty;
   }
@@ -192,7 +217,11 @@ export class FileStorageService {
       }
 
       // Remove from search index
-      await this.removeFromSearchIndex(id);
+      try {
+        await this.removeFromSearchIndex(id);
+      } catch (error) {
+        console.warn('Warning: Could not remove from search index (KV may not be available):', error);
+      }
     } catch (error) {
       console.error('Error deleting property:', error);
       throw new Error('Failed to delete property');
