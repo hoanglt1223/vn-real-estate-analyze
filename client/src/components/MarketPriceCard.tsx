@@ -1,8 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, TrendingDown, DollarSign, Expand, Minimize2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getNumber } from '@/lib/typeSafety';
+import { useState } from 'react';
 
 interface PriceData {
   min: number;
@@ -24,6 +27,7 @@ interface MarketPriceCardProps {
 }
 
 export default function MarketPriceCard({ data }: MarketPriceCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   if (!data) return null;
 
   const formatPrice = (price: any) => {
@@ -56,15 +60,29 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
             <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
             Giá Thị Trường
           </CardTitle>
-          {data.trend && (
-            <Badge variant={data.trend === 'up' ? 'default' : data.trend === 'down' ? 'destructive' : 'secondary'} className="text-xs">
-              {data.trend === 'up' ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-              {data.trend === 'up' ? 'Tăng' : data.trend === 'down' ? 'Giảm' : 'Ổn định'}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {data.trend && (
+              <Badge variant={data.trend === 'up' ? 'default' : data.trend === 'down' ? 'destructive' : 'secondary'} className="text-xs">
+                {data.trend === 'up' ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
+                {data.trend === 'up' ? 'Tăng' : data.trend === 'down' ? 'Giảm' : 'Ổn định'}
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="h-8 px-2 text-xs sm:text-sm sm:hidden"
+              data-testid="button-expand-price-card"
+            >
+              {isExpanded ? <Minimize2 className="w-3 h-3" /> : <Expand className="w-3 h-3" />}
+              <span className="ml-1">{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+            </Button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <CollapsibleContent>
+          <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2 md:gap-3">
           <div className="space-y-1 min-w-0">
             <p className="text-[10px] sm:text-xs text-muted-foreground">Thấp nhất</p>
@@ -163,7 +181,9 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
             </div>
           </div>
         )}
-      </CardContent>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }

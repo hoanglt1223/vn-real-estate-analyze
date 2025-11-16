@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { School, Hospital, ShoppingCart, Dumbbell, MapPin, Star, Store, Clock, Building } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { School, Hospital, ShoppingCart, Dumbbell, MapPin, Star, Store, Clock, Building, Expand, Minimize2 } from 'lucide-react';
 import {
   getArray,
   getString,
@@ -9,6 +11,7 @@ import {
   isValidAmenity,
   safeReduce
 } from '@/lib/typeSafety';
+import { useState } from 'react';
 
 interface Amenity {
   id: string;
@@ -279,6 +282,8 @@ function getTypeLabel(amenity: Amenity): string {
 }
 
 export default function AmenityList({ amenities = [], onAmenityClick }: AmenityListProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   // Safe array handling with validation
   const safeAmenities = getArray(amenities).filter(isValidAmenity);
 
@@ -296,13 +301,27 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
       <CardHeader className="pb-3 sm:pb-6">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base sm:text-lg">Tiện Ích Gần Nhất</CardTitle>
-          <Badge variant="secondary" className="text-xs" data-testid="badge-amenity-count">
-            {safeAmenities.length} địa điểm
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs" data-testid="badge-amenity-count">
+              {safeAmenities.length} địa điểm
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="h-8 px-2 text-xs sm:text-sm sm:hidden"
+              data-testid="button-expand-amenity-card"
+            >
+              {isExpanded ? <Minimize2 className="w-3 h-3" /> : <Expand className="w-3 h-3" />}
+              <span className="ml-1">{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+            </Button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="px-3 sm:px-6">
-        <ScrollArea className="h-[40vh] max-h-[400px] min-h-[300px] sm:h-[50vh] sm:max-h-[500px] sm:min-h-[350px] pr-2 sm:pr-4">
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <CollapsibleContent>
+          <CardContent className="px-3 sm:px-6">
+            <ScrollArea className="h-[40vh] max-h-[400px] min-h-[300px] sm:h-[50vh] sm:max-h-[500px] sm:min-h-[350px] pr-2 sm:pr-4">
           <div className="space-y-3 sm:space-y-4 md:space-y-6">
             {Object.entries(groupedAmenities).map(([category, items]) => (
               <div key={category} className="space-y-2 sm:space-y-3">
@@ -364,8 +383,10 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
               </div>
             ))}
           </div>
-        </ScrollArea>
-      </CardContent>
+            </ScrollArea>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }

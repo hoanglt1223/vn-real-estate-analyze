@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BarChart3, MapPin } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { BarChart3, MapPin, Expand, Minimize2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface Amenity {
@@ -38,8 +39,9 @@ const categoryColors: Record<string, string> = {
 
 export default function AmenityStatistics({ amenities, onAmenityClick }: AmenityStatisticsProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
-  const filteredAmenities = selectedCategory === 'all' 
-    ? amenities 
+  const [isExpanded, setIsExpanded] = useState(false);
+  const filteredAmenities = selectedCategory === 'all'
+    ? amenities
     : amenities.filter(a => a.category === selectedCategory);
 
   const categoryCounts: Record<string, number> = {};
@@ -69,13 +71,27 @@ export default function AmenityStatistics({ amenities, onAmenityClick }: Amenity
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <BarChart3 className="w-5 h-5" />
-          Thống Kê Tiện Ích
-        </CardTitle>
+      <CardHeader className="pb-3 sm:pb-6">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
+            Thống Kê Tiện Ích
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="h-8 px-2 text-xs sm:text-sm sm:hidden"
+            data-testid="button-expand-stats-card"
+          >
+            {isExpanded ? <Minimize2 className="w-3 h-3" /> : <Expand className="w-3 h-3" />}
+            <span className="ml-1">{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <CollapsibleContent>
+          <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
         {amenities.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Vẽ khu đất và nhấn "Phân Tích Ngay" để xem thống kê
@@ -162,7 +178,9 @@ export default function AmenityStatistics({ amenities, onAmenityClick }: Amenity
             )}
           </>
         )}
-      </CardContent>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }
