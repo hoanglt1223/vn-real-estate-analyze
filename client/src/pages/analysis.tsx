@@ -413,7 +413,7 @@ export default function AnalysisPage() {
         <h1 className="text-base sm:text-lg font-semibold truncate">Phân Tích Bất Động Sản</h1>
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           {/* Mobile sidebar controls */}
-          <div className="flex gap-1 sm:hidden">
+          <div className="flex gap-1 md:hidden lg:hidden">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -455,6 +455,28 @@ export default function AnalysisPage() {
             )}
           </div>
 
+          {/* Tablet sidebar controls */}
+          <div className="hidden md:flex lg:hidden gap-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => setShowRightSidebar(!showRightSidebar)}
+                    variant={showRightSidebar ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 px-2"
+                    data-testid="button-right-sidebar-tablet"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Kết quả phân tích</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
           <Button
             asChild
             variant="ghost"
@@ -482,7 +504,7 @@ export default function AnalysisPage() {
       </div>
       
       <div className="flex-1 flex overflow-hidden">
-        <div className={`${showLeftSidebar ? 'block' : 'hidden'} md:block w-64 lg:w-72 xl:w-80 2xl:w-96 border-r bg-background absolute md:relative z-[100] h-full bg-background md:bg-transparent`}>
+        <div className={`${showLeftSidebar ? 'block' : 'hidden'} md:block w-64 md:w-72 lg:w-80 xl:w-96 2xl:w-[448px] border-r bg-background absolute md:relative z-[100] h-full bg-background md:bg-transparent`}>
           <ScrollArea className="h-full">
             <div className="flex items-center justify-between md:hidden p-3 border-b">
               <h3 className="text-sm font-medium">Bộ lọc & Công cụ</h3>
@@ -495,7 +517,7 @@ export default function AnalysisPage() {
                 <X className="w-4 h-4" />
               </Button>
             </div>
-            <div className="p-3 lg:p-4 xl:p-6 space-y-3 lg:space-y-4 xl:space-y-6">
+            <div className="p-3 md:p-4 lg:p-5 xl:p-6 space-y-3 md:space-y-4 lg:space-y-5 xl:space-y-6">
               <PropertyInputPanel
                 area={propertyData.area}
                 orientation={propertyData.orientation}
@@ -577,7 +599,7 @@ export default function AnalysisPage() {
           </div>
 
           {analysisResults && (
-            <div className="md:hidden">
+            <div className="lg:hidden md:block">
               <Tabs defaultValue="analysis" className="w-full">
                 <TabsList className="w-full rounded-none h-12 grid grid-cols-3">
                   <TabsTrigger value="analysis" className="text-xs sm:text-sm truncate">Phân tích</TabsTrigger>
@@ -612,9 +634,9 @@ export default function AnalysisPage() {
         </div>
 
         {analysisResults && (
-          <div className={`${showRightSidebar ? 'block' : 'hidden'} md:block w-64 lg:w-72 xl:w-80 2xl:w-96 border-l bg-background absolute md:relative right-0 z-[100] h-full bg-background md:bg-transparent`}>
+          <div className={`${showRightSidebar ? 'block' : 'hidden'} md:hidden lg:block w-64 md:w-72 lg:w-80 xl:w-96 2xl:w-[448px] border-l bg-background absolute md:relative right-0 z-[100] h-full bg-background md:bg-transparent`}>
             <ScrollArea className="h-full">
-              <div className="flex items-center justify-between md:hidden p-3 border-b">
+              <div className="flex items-center justify-between md:hidden lg:hidden p-3 border-b">
                 <h3 className="text-sm font-medium">Kết quả phân tích</h3>
                 <Button
                   variant="ghost"
@@ -625,7 +647,7 @@ export default function AnalysisPage() {
                   <X className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="p-3 lg:p-4 xl:p-6 space-y-3 lg:space-y-4 xl:space-y-6">
+              <div className="p-3 md:p-4 lg:p-5 xl:p-6 space-y-3 md:space-y-4 lg:space-y-5 xl:space-y-6">
                 <AIAnalysisCard
                   scores={analysisResults.aiAnalysis.scores}
                   scoreExplanations={analysisResults.aiAnalysis.scoreExplanations}
