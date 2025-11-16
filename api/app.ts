@@ -460,34 +460,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Property Search
-    if (req.method === 'GET' && action === 'properties-search') {
+    if (req.method === 'POST' && action === 'properties-search') {
       try {
-        const query = req.query.q as string;
+        const { query, filters: searchFilters = {} } = req.body;
+
         if (!query) {
           return res.status(400).json({ error: 'Search query required' });
         }
 
         const filters = {
-          propertyType: req.query.type?.toString().split(',') || undefined,
-          transactionType: req.query.transactionType as string || undefined,
-          minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
-          maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
-          minArea: req.query.minArea ? Number(req.query.minArea) : undefined,
-          maxArea: req.query.maxArea ? Number(req.query.maxArea) : undefined,
-          limit: req.query.limit ? Number(req.query.limit) : 20
+          propertyType: searchFilters.propertyType || undefined,
+          transactionType: searchFilters.transactionType || undefined,
+          minPrice: searchFilters.minPrice || undefined,
+          maxPrice: searchFilters.maxPrice || undefined,
+          minArea: searchFilters.minArea || undefined,
+          maxArea: searchFilters.maxArea || undefined,
+          limit: searchFilters.limit || 20,
+          sortBy: searchFilters.sortBy || 'createdAt',
+          sortOrder: searchFilters.sortOrder || 'desc'
         };
 
         const results = await FileStorageService.searchProperties({
           text: query,
-          filters: {
-            propertyType: filters.propertyType,
-            transactionType: filters.transactionType,
-            minPrice: filters.minPrice,
-            maxPrice: filters.maxPrice,
-            minArea: filters.minArea,
-            maxArea: filters.maxArea,
-            limit: filters.limit
-          }
+          filters: filters
         });
         return res.json(results);
       } catch (error: any) {
