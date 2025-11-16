@@ -1,4 +1,5 @@
 import { PropertyAnalysis } from '../services/api/services.js';
+import { type PropertyAnalysisExtended } from '../services/property-analysis.service.js';
 
 export interface ExportOptions {
   format: 'html' | 'markdown' | 'json' | 'csv';
@@ -9,7 +10,7 @@ export interface ExportOptions {
 }
 
 export interface ExportData {
-  analysis: PropertyAnalysis;
+  analysis: PropertyAnalysis | PropertyAnalysisExtended;
   rawData: any;
   historicalData?: any;
   timestamp: Date;
@@ -20,7 +21,7 @@ export class ExportService {
    * Generate comprehensive report with all data
    */
   static async generateFullReport(
-    analysis: PropertyAnalysis,
+    analysis: PropertyAnalysis | PropertyAnalysisExtended,
     options: ExportOptions
   ): Promise<{
     content: string;
@@ -77,7 +78,7 @@ export class ExportService {
         <main class="report-content">
             ${this.generateHTMLSection('basic-info', '📊 Thông tin cơ bản', this.generateBasicInfoHTML(analysis, rawData))}
             ${this.generateHTMLSection('location', '📍 Vị trí', this.generateLocationHTML(analysis))}
-            ${this.generateHTMLSection('amenities', '🏪 Tiện ích xung quanh', this.generateAmenitiesHTML(analysis.amenities, rawData))}
+            ${this.generateHTMLSection('amenities', '🏪 Tiện ích xung quanh', this.generateAmenitiesHTML(analysis.amenities || [], rawData))}
             ${this.generateHTMLSection('infrastructure', '🛣️ Hạ tầng giao thông', this.generateInfrastructureHTML(analysis.infrastructure, rawData))}
             ${this.generateHTMLSection('market', '📈 Phân tích thị trường', this.generateMarketHTML(analysis.marketData, rawData))}
             ${this.generateHTMLSection('ai-analysis', '🤖 Phân tích AI', this.generateAIAnalysisHTML(analysis.aiAnalysis, rawData))}
@@ -154,7 +155,7 @@ export class ExportService {
     }
 
     // Amenities
-    if (analysis.amenities) {
+    if (analysis.amenities && analysis.amenities.length > 0) {
       markdown += `## 🏪 Tiện ích xung quanh\n\n`;
       analysis.amenities.forEach((category: any) => {
         markdown += `### ${category.name}\n\n`;
@@ -391,7 +392,7 @@ export class ExportService {
   /**
    * Extract raw data from analysis
    */
-  private static extractRawData(analysis: PropertyAnalysis): any {
+  private static extractRawData(analysis: PropertyAnalysis | PropertyAnalysisExtended): any {
     return {
       coordinates: analysis.coordinates,
       areaDetails: `${analysis.area || 0}m² (${analysis.area ? (analysis.area * 10.764) : 0} sq ft)`,
@@ -409,7 +410,7 @@ export class ExportService {
   /**
    * Get historical data (mock for now)
    */
-  private static async getHistoricalData(analysis: PropertyAnalysis): Promise<any> {
+  private static async getHistoricalData(analysis: PropertyAnalysis | PropertyAnalysisExtended): Promise<any> {
     // Mock data - in production would query real historical data
     return {
       location: analysis.center ? `${analysis.center.lat}, ${analysis.center.lng}` : 'Unknown',
@@ -724,7 +725,7 @@ export class ExportService {
   /**
    * HTML generation helpers
    */
-  private static generateHTMLHeader(analysis: PropertyAnalysis, timestamp: Date): string {
+  private static generateHTMLHeader(analysis: PropertyAnalysis | PropertyAnalysisExtended, timestamp: Date): string {
     return `
       <header class="report-header">
         <h1>🏠 Báo Cáo Phân Tích Bất Động Sản</h1>
@@ -756,7 +757,7 @@ export class ExportService {
     `;
   }
 
-  private static generateBasicInfoHTML(analysis: PropertyAnalysis, rawData: any): string {
+  private static generateBasicInfoHTML(analysis: PropertyAnalysis | PropertyAnalysisExtended, rawData: any): string {
     return `
       <div class="metric-grid">
         <div class="metric-card">
@@ -784,7 +785,7 @@ export class ExportService {
     `;
   }
 
-  private static generateLocationHTML(analysis: PropertyAnalysis): string {
+  private static generateLocationHTML(analysis: PropertyAnalysis | PropertyAnalysisExtended): string {
     return analysis.center ? `
       <table class="data-table">
         <tr><th>Thuộc tính</th><th>Giá trị</th></tr>

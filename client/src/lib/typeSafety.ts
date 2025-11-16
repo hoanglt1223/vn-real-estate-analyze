@@ -114,7 +114,7 @@ export function safeMap<T, U>(
   mapper: (item: T, index: number) => U,
   defaultValue: U[] = []
 ): U[] {
-  const safeArray = getArray<T>(array, defaultValue);
+  const safeArray = getArray<T>(array, [] as T[]);
   return safeArray.map(mapper);
 }
 

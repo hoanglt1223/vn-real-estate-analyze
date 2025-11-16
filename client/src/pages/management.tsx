@@ -187,24 +187,24 @@ const handleExport = () => {
       coordinates: getArray(p.coordinates),
       area: getNumber(p.area),
       orientation: getString(p.orientation, 'N/A'),
-      frontageCount: getNumber(p.frontageCount),
-      center: p.center || null,
-      propertyType: p.propertyType || null,
-      valuation: p.valuation || null,
-      askingPrice: p.askingPrice || null,
-      notes: getString(p.notes, null),
-      aiAnalysis: p.aiAnalysis ? {
-        scores: p.aiAnalysis.scores || {},
-        recommendation: getString(p.aiAnalysis.recommendation),
-        summary: getString(p.aiAnalysis.summary)
+      frontageCount: getNumber((p as any).frontageCount),
+      center: (p as any).center || null,
+      propertyType: (p as any).propertyType || null,
+      valuation: (p as any).valuation || null,
+      askingPrice: (p as any).askingPrice || null,
+      notes: getString((p as any).notes),
+      aiAnalysis: (p as any).aiAnalysis ? {
+        scores: (p as any).aiAnalysis.scores || {},
+        recommendation: getString((p as any).aiAnalysis.recommendation),
+        summary: getString((p as any).aiAnalysis.summary)
       } : null,
-      marketData: p.marketData ? {
-        avgPrice: p.marketData.avgPrice || null,
-        avgPricePerSqm: p.marketData.avgPricePerSqm || null,
-        minPrice: p.marketData.minPrice || null,
-        maxPrice: p.marketData.maxPrice || null
+      marketData: (p as any).marketData ? {
+        avgPrice: (p as any).marketData.avgPrice || null,
+        avgPricePerSqm: (p as any).marketData.avgPricePerSqm || null,
+        minPrice: (p as any).marketData.minPrice || null,
+        maxPrice: (p as any).marketData.maxPrice || null
       } : null,
-      createdAt: p.createdAt || null
+      createdAt: (p as any).createdAt || null
     };
   }).filter(Boolean); // Remove null entries
 
@@ -266,7 +266,7 @@ const handleImport = async () => {
 };
 
   // Use searchResults if available, otherwise use properties with type safety
-const currentProperties = getArray(isSearchMode ? searchResults : properties);
+const currentProperties = getArray(isSearchMode ? searchResults : analyses);
 
   const formatCurrency = (amount: number | null | undefined) => {
     if (!amount) return 'Chưa cập nhật';

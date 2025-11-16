@@ -156,7 +156,7 @@ export async function fetchAmenities(
   radius: number,
   categories: string[],
   includeSmallShops: boolean = false,
-  maxResults?: number = 1000
+  maxResults: number = 1000
 ): Promise<any[]> {
   // Generate cache key based on location, radius, categories, and settings
   const cacheKey = generateCacheKey('amenities', {

@@ -774,7 +774,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: validation.error });
           }
 
-          fileData = Buffer.from(base64File, 'base64');
+          fileData = Buffer.from(base64File, 'base64').buffer;
           fileName = filename;
           mimeType = fileType;
           propertyId = propId;
@@ -1358,6 +1358,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           format: format as any,
           includeHistorical,
           includeRawData,
+          includeCharts: false,
           template: template as any
         };
 
@@ -1399,6 +1400,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           format: 'markdown' as const,
           includeHistorical,
           includeRawData: true,
+          includeCharts: false,
           template: 'modern' as const
         };
 
@@ -1432,6 +1434,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           format: 'html' as const,
           includeHistorical,
           includeRawData: true,
+          includeCharts: false,
           template: template as any
         };
 
@@ -1465,6 +1468,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           format: 'html' as const,
           includeHistorical,
           includeRawData: true,
+          includeCharts: false,
           template: 'modern' as const
         };
 

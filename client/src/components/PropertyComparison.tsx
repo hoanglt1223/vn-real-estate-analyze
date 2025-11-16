@@ -119,11 +119,11 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
         property,
         metrics: {
           area: getNumber(property.area),
-          pricePerSqm: getNumber(property.marketData?.avgPricePerSqm),
-          overallScore: getNumber(property.aiAnalysis?.scores?.overall),
-          amenityScore: getNumber(property.aiAnalysis?.scores?.amenities),
-          riskLevel: getString(property.risks?.[0]?.severity, 'low'),
-          frontageCount: getNumber(property.frontageCount),
+          pricePerSqm: getNumber((property as any).marketData?.avgPricePerSqm),
+          overallScore: getNumber((property as any).aiAnalysis?.scores?.overall),
+          amenityScore: getNumber((property as any).aiAnalysis?.scores?.amenities),
+          riskLevel: getString((property as any).risks?.[0]?.severity, 'low'),
+          frontageCount: getNumber((property as any).frontageCount),
         }
       } as ComparisonData;
     }).filter(Boolean) as ComparisonData[];

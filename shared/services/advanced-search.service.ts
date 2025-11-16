@@ -28,6 +28,7 @@ export interface AdvancedSearchFilters extends PropertyFilters {
     east: number;
     west: number;
   };
+  location?: string; // Text search for location
 
   // Property features
   bedrooms?: { min?: number; max?: number };
@@ -245,6 +246,8 @@ export class AdvancedSearchService {
       return {
         properties: paginatedProperties,
         total: properties.length,
+        limit,
+        offset,
         page: Math.floor(offset / limit) + 1,
         totalPages: Math.ceil(properties.length / limit),
         query,
@@ -260,6 +263,8 @@ export class AdvancedSearchService {
       return {
         properties: [],
         total: 0,
+        limit: query.pagination?.limit || 10,
+        offset: query.pagination?.offset || 0,
         page: 1,
         totalPages: 0,
         query,

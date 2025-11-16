@@ -142,7 +142,7 @@ export class PropertyAnalysisService {
     const locationHash = this.generateLocationHash(analysis.center, analysis.area);
     const propertyHash = this.generatePropertyHash(
       analysis.area,
-      analysis.orientation,
+      analysis.orientation.toString(),
       analysis.frontageCount,
       analysis.coordinates
     );
@@ -167,7 +167,7 @@ export class PropertyAnalysisService {
         // Check for property characteristics match
         const existingPropertyHash = this.generatePropertyHash(
           existing.area,
-          existing.orientation,
+          existing.orientation.toString(),
           existing.frontageCount,
           existing.coordinates
         );
@@ -247,7 +247,7 @@ export class PropertyAnalysisService {
       locationHash: this.generateLocationHash(analysis.center, analysis.area),
       propertyHash: this.generatePropertyHash(
         analysis.area,
-        analysis.orientation,
+        analysis.orientation.toString(),
         analysis.frontageCount,
         analysis.coordinates
       ),

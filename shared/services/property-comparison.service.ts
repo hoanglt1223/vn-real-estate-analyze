@@ -574,7 +574,7 @@ export class PropertyComparisonService {
    * Generate share token for public comparisons
    */
   static generateShareToken(): string {
-    return crypto.randomBytes(32).toString('hex');
+    return randomBytes(32).toString('hex');
   }
 
   /**

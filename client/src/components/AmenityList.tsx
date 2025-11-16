@@ -288,11 +288,12 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
   const safeAmenities = getArray(amenities).filter(isValidAmenity);
 
   const groupedAmenities = safeReduce(safeAmenities, (acc, amenity) => {
-    const category = getString(amenity.category, 'other');
+    const amenityTyped = amenity as Amenity;
+    const category = getString(amenityTyped.category, 'other');
     if (!acc[category]) {
       acc[category] = [];
     }
-    acc[category].push(amenity);
+    acc[category].push(amenityTyped);
     return acc;
   }, {} as Record<string, Amenity[]>);
 
@@ -336,22 +337,23 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
                   {getArray(items).map((amenity) => {
-                    const typeLabel = getTypeLabel(amenity);
+                    const amenityTyped = amenity as Amenity;
+                    const typeLabel = getTypeLabel(amenityTyped);
 
                     return (
                       <div
-                        key={getString(amenity.id, Math.random().toString())}
+                        key={getString(amenityTyped.id, Math.random().toString())}
                         className="flex items-start gap-1.5 sm:gap-2 md:gap-3 p-1.5 sm:p-2 md:p-3 rounded-md hover-elevate active-elevate-2 cursor-pointer border"
-                        onClick={() => isValidAmenity(amenity) && onAmenityClick?.(amenity)}
-                        data-testid={`amenity-${getString(amenity.id)}`}
+                        onClick={() => isValidAmenity(amenityTyped) && onAmenityClick?.(amenityTyped)}
+                        data-testid={`amenity-${getString(amenityTyped.id)}`}
                       >
                         <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                             <p className="text-xs sm:text-sm font-medium truncate">
-                              {getString(amenity.name, 'Không xác định')}
+                              {getString(amenityTyped.name, 'Không xác định')}
                             </p>
-                            {amenity.isChain && (
+                            {amenityTyped.isChain && (
                               <Badge variant="secondary" className="text-[10px] px-1 py-0.5 shrink-0">
                                 <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
                                 <span className="hidden sm:inline">Chuỗi</span>
@@ -367,12 +369,12 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
                           <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 mt-1 flex-wrap">
                             <div className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
                               <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
-                              {getNumber(amenity.walkTime, 0)} phút
+                              {getNumber(amenityTyped.walkTime, 0)} phút
                             </div>
                             <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
-                              ({getNumber(amenity.distance, 0) >= 1000
-                                ? `${(getNumber(amenity.distance, 0) / 1000).toFixed(1)} km`
-                                : `${getNumber(amenity.distance, 0)} m`})
+                              ({getNumber(amenityTyped.distance, 0) >= 1000
+                                ? `${(getNumber(amenityTyped.distance, 0) / 1000).toFixed(1)} km`
+                                : `${getNumber(amenityTyped.distance, 0)} m`})
                             </span>
                           </div>
                         </div>
