@@ -139,9 +139,8 @@ export default function AIAnalysisCard({
                   fill="none"
                   strokeDasharray={`${2 * Math.PI * 40}`}
                   strokeDashoffset={`${2 * Math.PI * 40 * (1 - scores.overall / 100)}`}
-                  className={getScoreColor(scores.overall)}
+                  className={`${getScoreColor(scores.overall)} sm:hidden`}
                   strokeLinecap="round"
-                  sm:hidden
                 />
                 <circle
                   cx="64"
