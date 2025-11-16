@@ -53,6 +53,7 @@ export async function analyzeProperty(data: {
   categories: string[];
   layers: string[];
   includeSmallShops?: boolean;
+  maxAmenities?: number;
   signal?: AbortSignal;
 }) {
   const response = await fetch(API_ENDPOINTS.analyzeProperty, {
@@ -65,7 +66,8 @@ export async function analyzeProperty(data: {
       radius: data.radius,
       categories: data.categories,
       layers: data.layers,
-      includeSmallShops: data.includeSmallShops || false
+      includeSmallShops: data.includeSmallShops || false,
+      maxAmenities: data.maxAmenities || 500
     }),
     signal: data.signal,
   });

@@ -155,15 +155,17 @@ export async function fetchAmenities(
   lng: number,
   radius: number,
   categories: string[],
-  includeSmallShops: boolean = false
+  includeSmallShops: boolean = false,
+  maxResults?: number = 1000
 ): Promise<any[]> {
-  // Generate cache key based on location, radius, categories, and includeSmallShops setting
+  // Generate cache key based on location, radius, categories, and settings
   const cacheKey = generateCacheKey('amenities', {
     lat: lat.toFixed(4),
     lng: lng.toFixed(4),
     radius,
     categories: categories.sort().join(','),
-    includeSmallShops
+    includeSmallShops,
+    maxResults: maxResults || 1000
   });
 
   // Try to get from cache first
@@ -269,10 +271,13 @@ export async function fetchAmenities(
 
   const sortedAmenities = allAmenities.sort((a, b) => a.distance - b.distance);
 
-  // Cache the combined result
-  localCache.set(cacheKey, sortedAmenities, CACHE_TTL.AMENITIES);
+  // Apply max results limit
+  const limitedAmenities = maxResults ? sortedAmenities.slice(0, maxResults) : sortedAmenities;
 
-  return sortedAmenities;
+  // Cache the combined result
+  localCache.set(cacheKey, limitedAmenities, CACHE_TTL.AMENITIES);
+
+  return limitedAmenities;
 }
 
 export async function fetchInfrastructure(
@@ -407,18 +412,23 @@ function buildOverpassQuery(lat: number, lng: number, radius: number, tags: Reco
   `;
 }
 
-// Vietnamese chains and notable places
+// Vietnamese chains and notable places - prioritized by quality/popularity
 const VIETNAMESE_CHAINS = {
-  electronics: ['thế giới di động', 'tgdd', 'fpt shop', 'viettel store', 'vinpro', 'nguyen kim', 'dien may xanh', 'mediamart', 'pico'],
-  pharmacy: ['pharmacity', 'long chau', 'an khang', 'fpt long chau', 'nhathuocan khang'],
-  supermarket: ['co.opmart', 'coopmart', 'big c', 'go!', 'lotte mart', 'emart', 'aeon mall', 'vinmart', 'winmart', 'bach hoa xanh'],
-  convenience: ['circle k', '7-eleven', 'familymart', 'gs25', 'vinmart+', 'winmart+'],
-  banking: ['vietcombank', 'vcb', 'techcombank', 'tcb', 'acb', 'sacombank', 'stb', 'bidv', 'vietinbank', 'mb bank', 'agribank', 'vpbank', 'tienphongbank'],
-  coffee: ['highlands coffee', 'starbucks', 'the coffee house', 'phúc long', 'trung nguyên', 'cafe den da', 'katinat'],
-  fashion: ['zara', 'h&m', 'uniqlo', 'mango', 'pull&bear', 'bershka', 'stradivarius', 'massimo dutti', 'adidas', 'nike', 'puma', 'new balance'],
-  restaurants: ['kfc', 'mcdonald\'s', 'pizza hut', 'domino\'s pizza', 'lotteria', 'jollibee', 'subway', 'highlands coffee'],
-  entertainment: ['cgv', 'lotte cinema', 'bhd star', 'cinestar', 'galaxy cinema', 'mega gs', 'platinum'],
-  education: ['vinschool', 'vinschool', 'apollo english', 'ila', 'british council', 'wall street english']
+  electronics: ['thế giới di động', 'tgdd', 'fpt shop', 'dien may xanh', 'nguyen kim', 'mediamart'],
+  pharmacy: ['pharmacity', 'long chau', 'an khang', 'fpt long chau'],
+  supermarket: ['co.opmart', 'coopmart', 'big c', 'go!', 'lotte mart', 'emart', 'aeon mall', 'bach hoa xanh'],
+  convenience: ['circle k', '7-eleven', 'familymart', 'gs25'],
+  banking: ['vietcombank', 'vcb', 'techcombank', 'tcb', 'acb', 'sacombank', 'bidv', 'vietinbank', 'mb bank', 'agribank'],
+  coffee: ['highlands coffee', 'starbucks', 'the coffee house', 'phúc long', 'trung nguyên', 'katinat'],
+  fashion: ['zara', 'h&m', 'uniqlo', 'mango', 'adidas', 'nike', 'puma'],
+  restaurants: ['kfc', 'mcdonald\'s', 'pizza hut', 'domino\'s pizza', 'lotteria', 'jollibee', 'subway', 'the coffee house'],
+  entertainment: ['cgv', 'lotte cinema', 'bhd star', 'cinestar', 'galaxy cinema', 'mega gs'],
+  education: ['vinschool', 'apollo english', 'ila', 'british council', 'wall street english'],
+  // Additional quality chains
+  'high-end-retail': ['muji', 'uniqlo', 'zara home', 'h&m home', 'IKEA'],
+  'quality-food': ['highlands coffee', 'starbucks', 'the coffee house', 'phúc long', 'gonline', 'pizza company'],
+  'premium-services': ['vietcombank', 'techcombank', 'acb', 'hsbc', 'an bhin bank', 'uob'],
+  'mass-chains': ['circle k', '7-eleven', 'vinmart+', 'winmart+', 'coop food']
 };
 
 function isVietnameseChain(tags: any): boolean {
@@ -442,60 +452,72 @@ function isVietnameseChain(tags: any): boolean {
 function isNotablePlace(tags: any, category: string, includeSmallShops: boolean = false): boolean {
   if (!tags) return false;
 
-  // Always include places with names
-  if (tags.name || tags['name:vi'] || tags['name:en']) {
+  const hasName = tags.name || tags['name:vi'] || tags['name:en'];
+  const isChain = isVietnameseChain(tags);
+  const isBranded = tags.brand || tags['brand:wikidata'];
+  const hasWikiData = tags.wikidata || tags.wikipedia;
+
+  // Priority 1: Major chains and branded places (highest quality)
+  if (isChain || isBranded) {
     return true;
   }
 
-  // Always include branded places and Vietnamese chains
-  if (tags.brand || tags['brand:wikidata'] || isVietnameseChain(tags)) {
+  // Priority 2: Places with wiki data (generally notable)
+  if (hasWikiData) {
     return true;
   }
 
-  // Always include places with wikidata or wikipedia
-  if (tags.wikidata || tags.wikipedia) {
-    return true;
+  // Priority 3: Educational institutions (all are valuable for analysis)
+  if (category === 'education') {
+    if (tags.amenity === 'university' || tags.amenity === 'college') return true;
+    if (tags.amenity === 'school' || tags.amenity === 'kindergarten' || tags.amenity === 'library') return true;
+    return hasName; // Only include named educational facilities
   }
 
-  // Transport hubs are always notable
+  // Priority 4: Healthcare facilities (all are valuable)
+  if (category === 'healthcare') {
+    if (tags.amenity === 'hospital' || tags.healthcare === 'hospital') return true;
+    if (tags.amenity === 'pharmacy') return true; // All pharmacies are useful
+    if (tags.amenity === 'clinic' || tags.amenity === 'doctors' || tags.amenity === 'dentist') {
+      return hasName; // Only include named clinics
+    }
+  }
+
+  // Priority 5: Transport hubs (major ones only)
   if (category === 'transport') {
     if (tags.aeroway === 'aerodrome') return true;
     if (tags.railway === 'station') return true;
     if (tags.amenity === 'bus_station') return true;
-    if (tags.highway === 'bus_stop' && (tags.name || tags.operator)) return true;
-    if (tags.operator) return true;
+    if (tags.highway === 'bus_stop' && (hasName || tags.operator)) return true;
+    return false; // Skip unnamed bus stops
   }
 
-  // Shopping - include major retailers and chains
+  // Priority 6: Shopping - only major retailers
   if (category === 'shopping') {
     if (tags.shop === 'mall' || tags.shop === 'supermarket' || tags.shop === 'department_store') return true;
-    if (tags.shop === 'convenience' && isVietnameseChain(tags)) return true;
-    if (tags.amenity === 'bank' || tags.amenity === 'atm') return true;
-    if (includeSmallShops && tags.shop) return true; // Include all shops if requested
+    if (tags.shop === 'convenience' && isChain) return true; // Only chain convenience stores
+    if (tags.amenity === 'bank') return true; // All banks are useful
+    if (tags.amenity === 'atm' && hasName) return true; // Only named ATMs
+    return false; // Skip small shops
   }
 
-  // Healthcare - include all medical facilities
-  if (category === 'healthcare') {
-    if (tags.amenity === 'hospital' || tags.healthcare === 'hospital') return true;
-    if (tags.amenity === 'clinic' || tags.amenity === 'doctors' || tags.amenity === 'dentist') return true;
-    if (tags.amenity === 'pharmacy') return true; // Include all pharmacies
-  }
-
-  // Education - include all educational institutions
-  if (category === 'education') {
-    if (tags.amenity === 'university' || tags.amenity === 'college') return true;
-    if (tags.amenity === 'school' || tags.amenity === 'kindergarten' || tags.amenity === 'library') return true;
-  }
-
-  // Entertainment and food
+  // Priority 7: Entertainment - only chains and notable places
   if (category === 'entertainment') {
-    if (tags.amenity === 'cinema' || tags.amenity === 'theatre' || tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food') return true;
-    if (tags.leisure === 'stadium' || tags.leisure === 'sports_centre' || tags.leisure === 'fitness_centre') return true;
-    if (tags.leisure === 'park' || tags.leisure === 'garden') return true;
-    if (tags.tourism === 'hotel' || tags.tourism === 'museum' || tags.tourism === 'gallery') return true;
-    if (includeSmallShops && (tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food')) return true;
+    if (tags.amenity === 'cinema' || tags.leisure === 'stadium') return true;
+    if (tags.tourism === 'hotel' && (isBranded || hasName)) return true;
+    if (tags.tourism === 'museum' || tags.tourism === 'gallery') return true;
+    if (tags.leisure === 'fitness_centre' && (isChain || hasName)) return true;
+    if (tags.leisure === 'park' || tags.leisure === 'garden') return true; // Parks are always useful
+
+    // For restaurants/cafes - only chains or well-named places
+    if (tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food') {
+      return isChain || (hasName && hasWikiData);
+    }
+
+    return false;
   }
 
+  // Default: don't include unnamed, unbranded places
   return false;
 }
 

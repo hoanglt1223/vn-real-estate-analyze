@@ -25,7 +25,8 @@ const analyzePropertySchema = z.object({
   radius: z.number().min(100).max(30000),
   categories: z.array(z.string()),
   layers: z.array(z.string()),
-  includeSmallShops: z.boolean().optional().default(false)
+  includeSmallShops: z.boolean().optional().default(false),
+  maxAmenities: z.number().optional().default(500) // Reduced default for performance
 });
 
 const updateSchema = z.object({
@@ -50,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST' && action === 'analyze-property') {
       const input = analyzePropertySchema.parse(req.body);
       const metrics = calculatePropertyMetrics(input.coordinates);
-      const amenities = await fetchAmenities(metrics.center.lat, metrics.center.lng, input.radius, input.categories, input.includeSmallShops);
+      const amenities = await fetchAmenities(metrics.center.lat, metrics.center.lng, input.radius, input.categories, input.includeSmallShops, input.maxAmenities);
       const infrastructure = await fetchInfrastructure(metrics.center.lat, metrics.center.lng, input.radius, input.layers);
       const riskAssessment = assessRisks(metrics.center, infrastructure);
       const marketData = await scrapeMarketPrices(metrics.center.lat, metrics.center.lng, input.radius);

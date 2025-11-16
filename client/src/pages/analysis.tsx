@@ -9,7 +9,7 @@ import MarketPriceCard from '@/components/MarketPriceCard';
 import AIAnalysisCard from '@/components/AIAnalysisCard';
 import RiskAssessmentCard from '@/components/RiskAssessmentCard';
 import InfrastructureLayer from '@/components/InfrastructureLayer';
-import AmenityHeatmap from '@/components/AmenityHeatmap';
+// import AmenityHeatmap from '@/components/AmenityHeatmap'; // DISABLED due to performance issues
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -32,11 +32,11 @@ export default function AnalysisPage() {
   // Set all categories and layers by default
   const [selectedCategories, setSelectedCategories] = useState(['education', 'healthcare', 'shopping', 'entertainment', 'transport']);
   const [selectedLayers, setSelectedLayers] = useState(['roads', 'metro', 'metro_lines', 'bus_routes', 'industrial', 'power', 'cemetery', 'water']);
-  const [includeSmallShops, setIncludeSmallShops] = useState(true);
+  const [includeSmallShops, setIncludeSmallShops] = useState(false); // Default to false for performance
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false); // RE-ENABLED with optimized canvas heatmap
 
   // Performance optimization: Request cancellation
   const analysisRequestRef = useRef<AbortController>();
@@ -211,17 +211,42 @@ export default function AnalysisPage() {
         categories: selectedCategories,
         layers: selectedLayers,
         includeSmallShops: includeSmallShops,
+        maxAmenities: 500, // Limit to high-quality amenities only
         signal: abortController.signal
       });
 
       // Only update results if this request wasn't aborted
       if (!abortController.signal.aborted) {
-        setAnalysisResults(results);
+        // Progressive loading - show partial results first
+        const partialResults = {
+          ...results,
+          amenities: results.amenities.slice(0, 100) // Show first 100 immediately
+        };
+        setAnalysisResults(partialResults);
 
         toast({
-          title: 'Thành công',
-          description: 'Đã phân tích xong khu đất'
+          title: 'Phân tích hoàn tất',
+          description: `Tìm thấy ${results?.amenities?.length || 0} tiện ích (đang tải ${Math.min(100, results?.amenities?.length || 0)} đầu tiên)`,
         });
+
+        // Then gradually load remaining amenities in chunks
+        const remainingAmenities = results.amenities.slice(100);
+        if (remainingAmenities.length > 0) {
+          setTimeout(() => {
+            if (!abortController.signal.aborted) {
+              setAnalysisResults({
+                ...results,
+                amenities: [...partialResults.amenities, ...remainingAmenities.slice(0, 200)]
+              });
+            }
+          }, 500); // Load next 200 after 500ms
+
+          setTimeout(() => {
+            if (!abortController.signal.aborted) {
+              setAnalysisResults(results); // Load all remaining
+            }
+          }, 1000); // Load all after 1 second
+        }
       }
     } catch (error: any) {
       // Don't show error toast for aborted requests
@@ -425,7 +450,7 @@ export default function AnalysisPage() {
                 onLayerChange={handleLayerChange}
               />
 
-              {/* Heatmap Toggle */}
+              {/* Heatmap Toggle - NEW: Optimized Canvas-based Heatmap */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium flex items-center gap-2">
@@ -438,11 +463,11 @@ export default function AnalysisPage() {
                     onClick={() => setShowHeatmap(!showHeatmap)}
                     className="px-3 py-1"
                   >
-                    {showHeatmap ? 'Bật' : 'Tắt'}
+                    {showHeatmap ? 'Tắt' : 'Bật'}
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Hiển thị mật độ tiện ích xung quanh khu đất
+                  Hiển thị mật độ tiện ích xung quanh khu đất (tối ưu hiệu năng)
                 </p>
               </div>
 

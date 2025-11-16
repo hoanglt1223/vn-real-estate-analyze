@@ -4,7 +4,7 @@ import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import { polygon, area, bearing, point, centroid, circle, destination } from '@turf/turf';
 import SearchAutocomplete from './SearchAutocomplete';
 import MarkerCluster from './MarkerCluster';
-import AmenityHeatmap from './AmenityHeatmap';
+import OptimizedHeatmap from './OptimizedHeatmap'; // NEW: High-performance canvas-based heatmap
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
@@ -42,7 +42,7 @@ interface MapViewProps {
   selectedLayers?: string[];
   infrastructure?: any;
   mapRef?: React.RefObject<any>;
-  showHeatmap?: boolean;
+  showHeatmap?: boolean; // RE-ENABLED - Using optimized canvas heatmap
 }
 
 const categoryColors: Record<string, string> = {
@@ -985,9 +985,9 @@ export default function MapView({
         />
       )}
 
-      {/* Add AmenityHeatmap component */}
+      {/* NEW: Optimized Canvas-based Heatmap */}
       {map.current && isLoaded && (
-        <AmenityHeatmap
+        <OptimizedHeatmap
           map={map.current}
           amenities={amenities}
           selectedCategories={selectedCategories}
