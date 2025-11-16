@@ -15,11 +15,11 @@ import {
   searchCategory,
   type PropertyAnalysis,
   type InsertPropertyAnalysis
-} from '@shared/services/api/services.js';
-import { fetchAmenities, fetchInfrastructure } from '@shared/services/api/overpass.js';
-import { AuthService } from '@shared/services/auth.service';
-import { FileStorageService } from '@shared/services/file-storage.service';
-import { CreateUserInput, LoginInput } from '@shared/types/user.types';
+} from '../shared/services/api/services.js';
+import { fetchAmenities, fetchInfrastructure } from '../shared/services/api/overpass.js';
+import { AuthService } from '../shared/services/auth.service';
+import { FileStorageService } from '../shared/services/file-storage.service';
+import { CreateUserInput, LoginInput } from '../shared/types/user.types';
 
 const store = new Map<string, PropertyAnalysis>();
 

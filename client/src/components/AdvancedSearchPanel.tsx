@@ -158,7 +158,7 @@ export default function AdvancedSearchPanel({ onSearch, onSavedSearches }: Advan
                 <SelectValue placeholder="Tất cả loại" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tất cả loại</SelectItem>
+                <SelectItem value="all">Tất cả loại</SelectItem>
                 <SelectItem value="Đất nền">Đất nền</SelectItem>
                 <SelectItem value="Nhà phố">Nhà phố</SelectItem>
                 <SelectItem value="Biệt thự">Biệt thự</SelectItem>
