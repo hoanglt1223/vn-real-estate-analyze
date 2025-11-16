@@ -12,6 +12,11 @@ export const API_ENDPOINTS = {
   analyzeProperty: `${API_BASE}?action=analyze-property`,
   analysis: (id: string) => `${API_BASE}?action=analysis&id=${id}`,
   recentAnalyses: (limit: number = 10) => `${API_BASE}?action=recent-analyses&limit=${limit}`,
+  analysisList: `${API_BASE}?action=analysis-list`,
+  analysisUpdate: (id: string) => `${API_BASE}?action=analysis-update`,
+  analysisDelete: (id: string) => `${API_BASE}?action=analysis-delete`,
+  analysisSearch: `${API_BASE}?action=analysis-search`,
+  analysisStatistics: `${API_BASE}?action=analysis-statistics`,
   propertiesList: `${API_BASE}?action=properties-list`,
   propertiesCreate: `${API_BASE}?action=properties-create`,
   propertiesDetail: (id: string) => `${API_BASE}?action=properties-detail&id=${id}`,
@@ -100,6 +105,54 @@ export async function getAnalysis(id: string) {
 export async function getRecentAnalyses(limit: number = 10) {
   const response = await fetch(API_ENDPOINTS.recentAnalyses(limit));
   if (!response.ok) throw new Error('Failed to fetch recent analyses');
+  return response.json();
+}
+
+export async function getAnalysisList() {
+  const response = await fetch(API_ENDPOINTS.analysisList);
+  if (!response.ok) throw new Error('Failed to fetch analysis list');
+  return response.json();
+}
+
+export async function updateAnalysis(id: string, updates: any) {
+  const response = await fetch(API_ENDPOINTS.analysisUpdate(id), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, ...updates }),
+  });
+  if (!response.ok) throw new Error('Failed to update analysis');
+  return response.json();
+}
+
+export async function deleteAnalysis(id: string) {
+  const response = await fetch(API_ENDPOINTS.analysisDelete(id), {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  if (!response.ok) throw new Error('Failed to delete analysis');
+  return response.json();
+}
+
+export async function searchAnalyses(criteria: {
+  text?: string;
+  coordinates?: { lat: number; lng: number };
+  radius?: number;
+  limit?: number;
+  offset?: number;
+}) {
+  const response = await fetch(API_ENDPOINTS.analysisSearch, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(criteria),
+  });
+  if (!response.ok) throw new Error('Failed to search analyses');
+  return response.json();
+}
+
+export async function getAnalysisStatistics() {
+  const response = await fetch(API_ENDPOINTS.analysisStatistics);
+  if (!response.ok) throw new Error('Failed to fetch analysis statistics');
   return response.json();
 }
 

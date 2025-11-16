@@ -17,6 +17,10 @@ import {
   type PropertyAnalysis,
   type InsertPropertyAnalysis
 } from '../shared/services/api/services.js';
+import {
+  PropertyAnalysisService,
+  type PropertyAnalysisExtended
+} from '../shared/services/property-analysis.service.js';
 import { fetchAmenities, fetchInfrastructure } from '../shared/services/api/overpass.js';
 import { AuthService } from '../shared/services/auth.service.js';
 import { FileStorageService } from '../shared/services/file-storage.service.js';
@@ -27,7 +31,7 @@ import { HistoricalPriceService } from '../shared/services/historical-price.serv
 import { ExportService } from '../shared/services/export.service.js';
 import { CreateUserInput, LoginInput } from '../shared/types/user.types.js';
 
-const store = new Map<string, PropertyAnalysis>();
+// Store removed - using PropertyAnalysisService for persistent storage
 
 const analyzePropertySchema = z.object({
   coordinates: z.array(z.array(z.number())),
@@ -45,8 +49,8 @@ const updateSchema = z.object({
   notes: z.string().optional().nullable()
 });
 
-function listRecent(limit: number): PropertyAnalysis[] {
-  return Array.from(store.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit);
+async function listRecent(limit: number): Promise<PropertyAnalysisExtended[]> {
+  return await PropertyAnalysisService.getRecentAnalyses(limit);
 }
 
 // Helper functions for price formatting and analysis
@@ -289,7 +293,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         }
 
-        // STEP 2: Fetch amenities and infrastructure (parallel - fast)
+      // STEP 2: Fetch amenities and infrastructure (parallel - fast)
         const [amenities, infrastructure] = await Promise.all([
           fetchAmenities(center.lat, center.lng, input.radius, input.categories, input.includeSmallShops, input.maxAmenities),
           fetchInfrastructure(center.lat, center.lng, input.radius, input.layers)
@@ -312,7 +316,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           risks: riskAssessment.risks
         });
 
-        // Store basic analysis
+        // Create analysis object
         const id = randomUUID();
         const analysis: PropertyAnalysis = {
           id,
@@ -328,11 +332,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           risks: riskAssessment.risks,
           propertyType: null,
           valuation: null,
+          askingPrice: null,
           notes: null,
           createdAt: new Date()
-        };
+        } as PropertyAnalysis;
 
-        store.set(id, analysis);
+        // Save with duplicate detection and merging (our new functionality)
+        const saveResult = await PropertyAnalysisService.saveAnalysis(analysis);
 
         // STEP 6: Start historical data scraping in background
         // Don't wait for this - run it async
@@ -346,12 +352,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
 
         return res.json({
-          ...analysis,
+          id: saveResult.analysis.id,
+          ...metrics,
+          amenities,
+          infrastructure,
+          marketData,
+          aiAnalysis,
+          risks: riskAssessment.risks,
+          overallRiskLevel: riskAssessment.overallRiskLevel,
           step: 'comprehensive',
           message: 'Full analysis complete. Historical data loading in background.',
           backgroundJobs: [
             { type: 'historicalPrices', status: 'loading', estimatedTime: '30-60 seconds' }
-          ]
+          ],
+          // Include merge information for UI feedback (our new functionality)
+          wasMerged: saveResult.wasMerged,
+          originalId: saveResult.originalId,
+          mergedFields: saveResult.mergedFields,
+          analysisCount: saveResult.analysis.analysisCount
         });
 
       } catch (error: any) {
@@ -366,39 +384,73 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET' && action === 'analysis') {
       const id = req.query.id as string || (req.body as any)?.id;
       if (!id) return res.status(400).json({ message: 'id required' });
-      const analysis = store.get(id);
+      const analysis = await PropertyAnalysisService.getAnalysis(id);
       if (!analysis) return res.status(404).json({ message: 'not found' });
       return res.json(analysis);
     }
 
     if (req.method === 'GET' && action === 'recent-analyses') {
       const limit = parseInt((req.query.limit as string) || '10', 10);
-      return res.json(listRecent(limit));
+      const recentAnalyses = await PropertyAnalysisService.getRecentAnalyses(limit);
+      return res.json(recentAnalyses);
     }
 
     if (req.method === 'GET' && action === 'analysis-list') {
-      return res.json(Array.from(store.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
+      const allAnalyses = await PropertyAnalysisService.getAllAnalyses();
+      return res.json(allAnalyses.sort((a, b) => {
+        const dateA = a.lastAnalyzedAt || a.createdAt;
+        const dateB = b.lastAnalyzedAt || b.createdAt;
+        return dateB.getTime() - dateA.getTime();
+      }));
     }
 
     if (req.method === 'PUT' && action === 'analysis-update') {
       const { id, ...data } = req.body as any;
       if (!id) return res.status(400).json({ message: 'id required' });
-      const existing = store.get(id);
-      if (!existing) return res.status(404).json({ message: 'not found' });
       const parseResult = updateSchema.safeParse(data);
       if (!parseResult.success) return res.status(400).json({ message: 'invalid data', details: parseResult.error.issues });
       const filteredData = Object.fromEntries(Object.entries(parseResult.data).filter(([_, v]) => v !== undefined));
-      const updated: PropertyAnalysis = { ...existing, ...filteredData } as PropertyAnalysis;
-      store.set(id, updated);
+      const updated = await PropertyAnalysisService.updateAnalysis(id, filteredData);
+      if (!updated) return res.status(404).json({ message: 'not found' });
       return res.json(updated);
     }
 
     if (req.method === 'DELETE' && action === 'analysis-delete') {
       const { id } = req.body as any;
       if (!id) return res.status(400).json({ message: 'id required' });
-      const ok = store.delete(id);
-      if (!ok) return res.status(404).json({ message: 'not found' });
+      const success = await PropertyAnalysisService.deleteAnalysis(id);
+      if (!success) return res.status(404).json({ message: 'not found' });
       return res.json({ success: true });
+    }
+
+    // Analysis search and statistics
+    if (req.method === 'POST' && action === 'analysis-search') {
+      try {
+        const { text, coordinates, radius, limit, offset } = req.body;
+
+        const searchResult = await PropertyAnalysisService.searchAnalyses({
+          text,
+          coordinates,
+          radius,
+          limit: limit || 20,
+          offset: offset || 0
+        });
+
+        return res.json(searchResult);
+      } catch (error: any) {
+        console.error('Analysis search error:', error);
+        return res.status(500).json({ error: 'Failed to search analyses' });
+      }
+    }
+
+    if (req.method === 'GET' && action === 'analysis-statistics') {
+      try {
+        const statistics = await PropertyAnalysisService.getStatistics();
+        return res.json(statistics);
+      } catch (error: any) {
+        console.error('Analysis statistics error:', error);
+        return res.status(500).json({ error: 'Failed to get statistics' });
+      }
     }
 
     if (req.method === 'GET' && action === 'locations-search') {
@@ -1005,7 +1057,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Historical Price Tracking Actions
+    // Analysis Status Check
     if (req.method === 'GET' && action === 'analysis-status') {
       try {
         const analysisId = req.query.id as string;
@@ -1014,7 +1066,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'Analysis ID required' });
         }
 
-        const analysis = store.get(analysisId);
+        const analysis = await PropertyAnalysisService.getAnalysis(analysisId);
         if (!analysis) {
           return res.status(404).json({ error: 'Analysis not found' });
         }
@@ -1287,7 +1339,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         }
 
-        const analysis = store.get(analysisId);
+        const analysis = await PropertyAnalysisService.getAnalysis(analysisId);
         if (!analysis) {
           return res.status(404).json({ error: 'Analysis not found' });
         }
@@ -1338,7 +1390,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         req.body.template = 'modern';
 
         // Continue with new export logic
-        const analysis = store.get(analysisId);
+        const analysis = await PropertyAnalysisService.getAnalysis(analysisId);
         if (!analysis) {
           return res.status(404).json({ error: 'Analysis not found' });
         }
@@ -1371,7 +1423,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const includeHistorical = req.body.includeHistorical || false;
         const template = req.body.template || 'modern';
 
-        const analysis = store.get(analysisId);
+        const analysis = await PropertyAnalysisService.getAnalysis(analysisId);
         if (!analysis) {
           return res.status(404).json({ error: 'Analysis not found' });
         }
@@ -1404,7 +1456,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const includeHistorical = req.body.includeHistorical || false;
 
         // For now, generate HTML which can be converted to PDF
-        const analysis = store.get(analysisId);
+        const analysis = await PropertyAnalysisService.getAnalysis(analysisId);
         if (!analysis) {
           return res.status(404).json({ error: 'Analysis not found' });
         }

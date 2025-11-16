@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { API_ENDPOINTS, searchProperties, importProperties } from '@/lib/api';
+import { API_ENDPOINTS, searchAnalyses, importProperties, getAnalysisList, updateAnalysis, deleteAnalysis, getAnalysisStatistics } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Edit, Trash2, MapPin, Calendar, DollarSign, ArrowLeft, Search, FileDown, Plus, Upload, FileText } from 'lucide-react';
+import { Edit, Trash2, MapPin, Calendar, DollarSign, ArrowLeft, Search, FileDown, Plus, Upload, FileText, BarChart3, TrendingUp, Layers } from 'lucide-react';
 import type { PropertyAnalysis } from '@shared/schema';
 import AdvancedSearchPanel from '@/components/AdvancedSearchPanel';
 import PropertyComparison from '@/components/PropertyComparison';
@@ -44,30 +44,39 @@ export default function ManagementPage() {
   const [editingProperty, setEditingProperty] = useState<PropertyAnalysis | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'properties' | 'comparison'>('properties');
-  const [searchResults, setSearchResults] = useState<PropertyAnalysis[] | null>(null);
+  const [searchResults, setSearchResults] = useState<{analyses: PropertyAnalysis[]} | null>(null);
   const [isSearchMode, setIsSearchMode] = useState(false);
 
-  const { data: properties, isLoading, refetch } = useQuery<PropertyAnalysis[]>({
-    queryKey: [API_ENDPOINTS.propertiesList]
+  const { data: analyses, isLoading, refetch } = useQuery<PropertyAnalysis[]>({
+    queryKey: ['analysis-list'],
+    queryFn: async () => {
+      const result = await getAnalysisList();
+      return result;
+    }
   });
 
-  // Fix: Handle searchResults correctly - it has a 'properties' key
+  // Get statistics for the dashboard
+  const { data: statistics } = useQuery({
+    queryKey: ['analysis-statistics'],
+    queryFn: getAnalysisStatistics
+  });
+
+  // Fix: Handle searchResults correctly - it has a 'analyses' key
 const displayProperties = isSearchMode
-  ? getArray(searchResults?.properties)
-  : getArray(properties);
+  ? getArray(searchResults?.analyses)
+  : getArray(analyses);
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<PropertyAnalysis> }) => {
-      const res = await apiRequest('PUT', `${API_ENDPOINTS.propertiesUpdate(data.id)}`, data.updates);
-      return res.json();
+      return await updateAnalysis(data.id, data.updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.propertiesList] });
+      queryClient.invalidateQueries({ queryKey: ['analysis-list'] });
       setIsEditDialogOpen(false);
       setEditingProperty(null);
       toast({
         title: 'Thành công',
-        description: 'Đã cập nhật thông tin bất động sản'
+        description: 'Đã cập nhật thông tin phân tích khu đất'
       });
     },
     onError: (error: any) => {
@@ -81,14 +90,13 @@ const displayProperties = isSearchMode
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest('DELETE', `${API_ENDPOINTS.propertiesDelete(id)}`);
-      return res.json();
+      return await deleteAnalysis(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.propertiesList] });
+      queryClient.invalidateQueries({ queryKey: ['analysis-list'] });
       toast({
         title: 'Thành công',
-        description: 'Đã xóa bất động sản'
+        description: 'Đã xóa phân tích khu đất'
       });
     },
     onError: (error: any) => {
@@ -133,13 +141,13 @@ const displayProperties = isSearchMode
 
   const handleSearch = async (criteria: any) => {
   try {
-    const results = await searchProperties(criteria);
+    const results = await searchAnalyses(criteria);
     setSearchResults(results);
     setIsSearchMode(true);
 
     toast({
       title: 'Tìm kiếm hoàn tất',
-      description: `Tìm thấy ${getArray(results).length} bất động sản phù hợp`,
+      description: `Tìm thấy ${getArray(results.analyses).length} phân tích khu đất phù hợp`,
     });
   } catch (error: any) {
     toast({
@@ -156,7 +164,7 @@ const handleClearSearch = () => {
 };
 
 const handleExport = () => {
-  const exportData = getArray(isSearchMode ? searchResults : properties);
+  const exportData = getArray(isSearchMode ? searchResults?.analyses : analyses);
 
   if (exportData.length === 0) {
     toast({
@@ -341,11 +349,11 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
               </Link>
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">Quản Lý Bất Động Sản</h1>
+              <h1 className="text-2xl font-bold">Quản Lý Phân Tích Khu Đất</h1>
               <p className="text-muted-foreground text-sm">
                 {isSearchMode
-                  ? `Tìm thấy ${getArray(displayProperties).length} bất động sản`
-                  : `Hiển thị ${getArray(displayProperties).length} / ${getArray(properties).length} bất động sản`
+                  ? `Tìm thấy ${getArray(displayProperties).length} phân tích khu đất`
+                  : `Hiển thị ${getArray(displayProperties).length} / ${getArray(analyses).length} phân tích khu đất`
                 }
               </p>
             </div>
@@ -374,9 +382,65 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
           </div>
         </div>
       </div>
-      
+
       <div className="flex-1 overflow-hidden">
         <div className="container mx-auto p-6 h-full">
+          {/* Statistics Dashboard */}
+          {statistics && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-4">Thống Kê Phân Tích</h2>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <BarChart3 className="w-8 h-8 text-blue-500" />
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Tổng số phân tích</p>
+                        <p className="text-2xl font-bold">{statistics.totalAnalyses}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="w-8 h-8 text-green-500" />
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Vị trí duy nhất</p>
+                        <p className="text-2xl font-bold">{statistics.uniqueLocations}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Layers className="w-8 h-8 text-purple-500" />
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Trung bình phân tích/địa điểm</p>
+                        <p className="text-2xl font-bold">{statistics.averageAnalysisCount.toFixed(1)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <TrendingUp className="w-8 h-8 text-orange-500" />
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Phân tích gần đây (30 ngày)</p>
+                        <p className="text-2xl font-bold">{statistics.recentAnalyses}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
           {/* Tab Navigation */}
           <div className="flex space-x-1 mb-6 bg-muted p-1 rounded-lg w-fit">
             <button
@@ -387,7 +451,7 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Danh sách Bất động sản
+              Danh sách Phân Tích
             </button>
             <button
               onClick={() => setActiveTab('comparison')}
@@ -413,9 +477,9 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
                     return (
                       <div className="flex flex-col items-center justify-center h-64 text-center">
                         <MapPin className="w-12 h-12 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-semibold text-muted-foreground">Chưa có bất động sản nào</h3>
+                        <h3 className="text-lg font-semibold text-muted-foreground">Chưa có phân tích khu đất nào</h3>
                         <p className="text-sm text-muted-foreground mt-2">
-                          {isSearchMode ? 'Không tìm thấy bất động sản nào phù hợp với tiêu chí tìm kiếm.' : 'Hãy bắt đầu phân tích bất động sản đầu tiên của bạn.'}
+                          {isSearchMode ? 'Không tìm thấy phân tích nào phù hợp với tiêu chí tìm kiếm.' : 'Hãy bắt đầu phân tích khu đất đầu tiên của bạn.'}
                         </p>
                       </div>
                     );
@@ -435,7 +499,17 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
                             <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                               <Calendar className="w-3 h-3" />
                               {formatDate(property.createdAt)}
+                              {(property as any).analysisCount && (property as any).analysisCount > 1 && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {(property as any).analysisCount} lần phân tích
+                                </Badge>
+                              )}
                             </div>
+                            {(property as any).lastAnalyzedAt && (
+                              <div className="text-xs text-muted-foreground">
+                                Phân tích gần đây: {formatDate((property as any).lastAnalyzedAt)}
+                              </div>
+                            )}
                           </div>
                           <div className="flex gap-1">
                             <Button
@@ -513,7 +587,7 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
 
           {activeTab === 'comparison' && (
             <div className="h-[calc(100vh-200px)]">
-              <PropertyComparison properties={getArray(properties)} />
+              <PropertyComparison properties={getArray(analyses)} />
             </div>
           )}
         </div>
@@ -522,7 +596,7 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Chỉnh Sửa Thông Tin Bất Động Sản</DialogTitle>
+            <DialogTitle>Chỉnh Sửa Thông Tin Phân Tích Khu Đất</DialogTitle>
           </DialogHeader>
           
           {editingProperty && (
