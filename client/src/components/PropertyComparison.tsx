@@ -11,6 +11,13 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeftRight, Plus, X, Check, TrendingUp, TrendingDown, Minus, GitCompare } from 'lucide-react';
 import type { PropertyAnalysis } from '@shared/schema';
 import { createPropertyComparison } from '@/lib/api';
+import {
+  getArray,
+  getString,
+  getNumber,
+  isValidProperty,
+  safeMap
+} from '@/lib/typeSafety';
 
 interface PropertyComparisonProps {
   properties: PropertyAnalysis[];
@@ -92,20 +99,21 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
       return;
     }
 
-    const selectedPropertiesData = selectedProperties.map(propertyId => {
-      const property = properties.find(p => p.id === propertyId);
-      if (!property) return null;
+    const selectedPropertiesData = safeMap(getArray(selectedProperties), (propertyId) => {
+      const safePropertyId = getString(propertyId);
+      const property = properties?.find(p => getString(p.id) === safePropertyId);
+      if (!property || !isValidProperty(property)) return null;
 
       return {
-        propertyId,
+        propertyId: safePropertyId,
         property,
         metrics: {
-          area: property.area,
-          pricePerSqm: property.marketData?.avgPricePerSqm || 0,
-          overallScore: property.aiAnalysis?.scores?.overall || 0,
-          amenityScore: property.aiAnalysis?.scores?.amenities || 0,
-          riskLevel: property.risks?.[0]?.severity || 'low',
-          frontageCount: property.frontageCount,
+          area: getNumber(property.area),
+          pricePerSqm: getNumber(property.marketData?.avgPricePerSqm),
+          overallScore: getNumber(property.aiAnalysis?.scores?.overall),
+          amenityScore: getNumber(property.aiAnalysis?.scores?.amenities),
+          riskLevel: getString(property.risks?.[0]?.severity, 'low'),
+          frontageCount: getNumber(property.frontageCount),
         }
       } as ComparisonData;
     }).filter(Boolean) as ComparisonData[];
@@ -180,22 +188,22 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
           </div>
           <Button
             onClick={handleCompare}
-            disabled={selectedProperties.length < 2}
+            disabled={getArray(selectedProperties).length < 2}
             className="flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            So sánh ({selectedProperties.length}/4)
+            So sánh ({getArray(selectedProperties).length}/4)
           </Button>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[300px]">
           <div className="space-y-4">
-            {properties.map((property) => (
+            {getArray(properties).filter(isValidProperty).map((property) => (
               <div
-                key={property.id}
+                key={getString(property.id)}
                 className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
-                  selectedProperties.includes(property.id)
+                  getArray(selectedProperties).includes(getString(property.id))
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
                 }`}

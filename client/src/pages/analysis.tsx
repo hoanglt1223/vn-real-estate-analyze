@@ -17,6 +17,14 @@ import { Play, FolderOpen, Settings, X, MapPin } from 'lucide-react';
 import { analyzeProperty } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { generatePDF } from '@/lib/pdfExport';
+import {
+  getArray,
+  getString,
+  getNumber,
+  isValidCoordinateArray,
+  isValidAmenity,
+  safePropertyAccess
+} from '@/lib/typeSafety';
 
 export default function AnalysisPage() {
   const { toast } = useToast();
@@ -74,17 +82,24 @@ export default function AnalysisPage() {
       water: 'Sông & kênh'
     };
 
-    Object.entries(infrastructure).forEach(([layer, items]: [string, any]) => {
-      if (Array.isArray(items) && layerNames[layer]) {
-        items.forEach((item: any, index: number) => {
-          if (item.lat && item.lon) {
+    // Safe iteration over infrastructure object
+    const safeInfrastructure = getArray(Object.entries(infrastructure || {}));
+    safeInfrastructure.forEach(([layer, items]: [string, any]) => {
+      const layerName = safePropertyAccess(layerNames, layer);
+      if (layerName) {
+        const safeItems = getArray(items);
+        safeItems.forEach((item: any, index: number) => {
+          const lat = getNumber(item.lat);
+          const lon = getNumber(item.lon);
+
+          if (lat && lon) {
             infrastructureAmenities.push({
-              id: `infra-${layer}-${index}`,
-              name: item.name || layerNames[layer] || layer,
+              id: `infra-${getString(layer)}-${index}`,
+              name: getString(item.name, layerName),
               category: 'infrastructure',
-              lat: item.lat,
-              lon: item.lon,
-              distance: item.distance
+              lat: lat,
+              lon: lon,
+              distance: getNumber(item.distance)
             });
           }
         });
@@ -96,7 +111,7 @@ export default function AnalysisPage() {
 
   // Combine regular amenities with infrastructure data for statistics
   const getAllAmenities = () => {
-    const regularAmenities = analysisResults?.amenities || [];
+    const regularAmenities = getArray(analysisResults?.amenities);
     const infrastructureAmenities = convertInfrastructureToAmenities(analysisResults?.infrastructure);
     return [...regularAmenities, ...infrastructureAmenities];
   };
@@ -121,32 +136,34 @@ export default function AnalysisPage() {
   };
 
   const handleAmenityClick = (amenity: any) => {
-    if (mapRef.current && mapRef.current.flyTo) {
-      // Validate coordinates before flying to amenity
+    if (mapRef.current && mapRef.current.flyTo && isValidAmenity(amenity)) {
+      // Safe coordinates using helper functions
+      const lon = getNumber(amenity.lon);
+      const lat = getNumber(amenity.lat);
+
+      // Validate coordinates range
       if (
-        typeof amenity?.lon === 'number' &&
-        typeof amenity?.lat === 'number' &&
-        !isNaN(amenity.lon) &&
-        !isNaN(amenity.lat) &&
-        amenity.lon >= -180 &&
-        amenity.lon <= 180 &&
-        amenity.lat >= -90 &&
-        amenity.lat <= 90
+        lon >= -180 && lon <= 180 &&
+        lat >= -90 && lat <= 90
       ) {
         mapRef.current.flyTo({
-          center: [amenity.lon, amenity.lat],
+          center: [lon, lat],
           zoom: 17,
           duration: 1000
         });
       } else {
         console.error('Invalid amenity coordinates for flyTo:', amenity);
       }
+    } else {
+      console.error('Invalid amenity data for flyTo:', amenity);
     }
   };
 
   const handleAnalyze = async () => {
-    // Enhanced validation for polygon data
-    if (!propertyData.coordinates || propertyData.coordinates.length === 0) {
+    // Enhanced validation for polygon data using helper functions
+    const safeCoordinates = getArray(propertyData.coordinates);
+
+    if (safeCoordinates.length === 0) {
       toast({
         title: 'Lỗi',
         description: 'Vui lòng vẽ khu đất trên bản đồ trước',
@@ -155,7 +172,8 @@ export default function AnalysisPage() {
       return;
     }
 
-    if (!propertyData.area || propertyData.area <= 0) {
+    const safeArea = getNumber(propertyData.area);
+    if (safeArea <= 0) {
       toast({
         title: 'Lỗi',
         description: 'Khu đất có diện tích không hợp lệ. Vui lòng vẽ lại khu đất.',
@@ -165,7 +183,7 @@ export default function AnalysisPage() {
     }
 
     // Additional validation: check if coordinates form a valid polygon
-    if (propertyData.coordinates.length < 3) {
+    if (safeCoordinates.length < 3) {
       toast({
         title: 'Lỗi',
         description: 'Khu đất không hợp lệ. Cần ít nhất 3 điểm để tạo khu đất. Vui lòng vẽ lại.',
@@ -174,17 +192,8 @@ export default function AnalysisPage() {
       return;
     }
 
-    // Validate coordinate format
-    const hasValidCoordinates = propertyData.coordinates.every(coord =>
-      Array.isArray(coord) &&
-      coord.length >= 2 &&
-      typeof coord[0] === 'number' &&
-      typeof coord[1] === 'number' &&
-      !isNaN(coord[0]) &&
-      !isNaN(coord[1])
-    );
-
-    if (!hasValidCoordinates) {
+    // Validate coordinate format using helper function
+    if (!isValidCoordinateArray(safeCoordinates)) {
       toast({
         title: 'Lỗi',
         description: 'Dữ liệu tọa độ không hợp lệ. Vui lòng vẽ lại khu đất.',
@@ -206,37 +215,38 @@ export default function AnalysisPage() {
 
     try {
       const results = await analyzeProperty({
-        coordinates: propertyData.coordinates,
-        radius: radius,
-        categories: selectedCategories,
-        layers: selectedLayers,
-        includeSmallShops: includeSmallShops,
+        coordinates: safeCoordinates,
+        radius: getNumber(radius),
+        categories: getArray(selectedCategories),
+        layers: getArray(selectedLayers),
+        includeSmallShops: Boolean(includeSmallShops),
         maxAmenities: 500, // Limit to high-quality amenities only
         signal: abortController.signal
       });
 
       // Only update results if this request wasn't aborted
       if (!abortController.signal.aborted) {
-        // Progressive loading - show partial results first
+        // Safe array operations for progressive loading
+        const safeAmenities = getArray(results.amenities);
         const partialResults = {
           ...results,
-          amenities: results.amenities.slice(0, 100) // Show first 100 immediately
+          amenities: safeAmenities.slice(0, 100) // Show first 100 immediately
         };
         setAnalysisResults(partialResults);
 
         toast({
           title: 'Phân tích hoàn tất',
-          description: `Tìm thấy ${results?.amenities?.length || 0} tiện ích (đang tải ${Math.min(100, results?.amenities?.length || 0)} đầu tiên)`,
+          description: `Tìm thấy ${safeAmenities.length} tiện ích (đang tải ${Math.min(100, safeAmenities.length)} đầu tiên)`,
         });
 
         // Then gradually load remaining amenities in chunks
-        const remainingAmenities = results.amenities.slice(100);
+        const remainingAmenities = safeAmenities.slice(100);
         if (remainingAmenities.length > 0) {
           setTimeout(() => {
             if (!abortController.signal.aborted) {
               setAnalysisResults({
                 ...results,
-                amenities: [...partialResults.amenities, ...remainingAmenities.slice(0, 200)]
+                amenities: [...getArray(partialResults.amenities), ...remainingAmenities.slice(0, 200)]
               });
             }
           }, 500); // Load next 200 after 500ms

@@ -17,6 +17,13 @@ import { Edit, Trash2, MapPin, Calendar, DollarSign, ArrowLeft, Search, FileDown
 import type { PropertyAnalysis } from '@shared/schema';
 import AdvancedSearchPanel from '@/components/AdvancedSearchPanel';
 import PropertyComparison from '@/components/PropertyComparison';
+import {
+  getArray,
+  getString,
+  getNumber,
+  isValidProperty,
+  safeMap
+} from '@/lib/typeSafety';
 
 export default function ManagementPage() {
   const { toast } = useToast();
@@ -30,7 +37,7 @@ export default function ManagementPage() {
     queryKey: [API_ENDPOINTS.propertiesList]
   });
 
-  const displayProperties = searchResults || properties || [];
+  const displayProperties = getArray(searchResults || properties);
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<PropertyAnalysis> }) => {
@@ -132,9 +139,9 @@ const handleClearSearch = () => {
 };
 
 const handleExport = () => {
-  const exportData = isSearchMode ? searchResults : properties;
+  const exportData = getArray(isSearchMode ? searchResults : properties);
 
-  if (!exportData || exportData.length === 0) {
+  if (exportData.length === 0) {
     toast({
       title: 'Không có dữ liệu',
       description: 'Không có bất động sản nào để xuất',
@@ -143,31 +150,38 @@ const handleExport = () => {
     return;
   }
 
-  // Sanitize and validate data before export
-  const sanitizedData = exportData.map(p => ({
-    id: p.id,
-    coordinates: p.coordinates,
-    area: p.area,
-    orientation: p.orientation || 'N/A',
-    frontageCount: p.frontageCount,
-    center: p.center,
-    propertyType: p.propertyType || null,
-    valuation: p.valuation || null,
-    askingPrice: p.askingPrice || null,
-    notes: p.notes || null,
-    aiAnalysis: p.aiAnalysis ? {
-      scores: p.aiAnalysis.scores,
-      recommendation: p.aiAnalysis.recommendation,
-      summary: p.aiAnalysis.summary
-    } : null,
-    marketData: p.marketData ? {
-      avgPrice: p.marketData.avgPrice,
-      avgPricePerSqm: p.marketData.avgPricePerSqm,
-      minPrice: p.marketData.minPrice,
-      maxPrice: p.marketData.maxPrice
-    } : null,
-    createdAt: p.createdAt
-  }));
+  // Sanitize and validate data before export using helper functions
+  const sanitizedData = safeMap(exportData, (p) => {
+    if (!isValidProperty(p)) {
+      console.warn('Skipping invalid property during export:', p);
+      return null;
+    }
+
+    return {
+      id: getString(p.id),
+      coordinates: getArray(p.coordinates),
+      area: getNumber(p.area),
+      orientation: getString(p.orientation, 'N/A'),
+      frontageCount: getNumber(p.frontageCount),
+      center: p.center || null,
+      propertyType: p.propertyType || null,
+      valuation: p.valuation || null,
+      askingPrice: p.askingPrice || null,
+      notes: getString(p.notes, null),
+      aiAnalysis: p.aiAnalysis ? {
+        scores: p.aiAnalysis.scores || {},
+        recommendation: getString(p.aiAnalysis.recommendation),
+        summary: getString(p.aiAnalysis.summary)
+      } : null,
+      marketData: p.marketData ? {
+        avgPrice: p.marketData.avgPrice || null,
+        avgPricePerSqm: p.marketData.avgPricePerSqm || null,
+        minPrice: p.marketData.minPrice || null,
+        maxPrice: p.marketData.maxPrice || null
+      } : null,
+      createdAt: p.createdAt || null
+    };
+  }).filter(Boolean); // Remove null entries
 
   const dataStr = JSON.stringify(sanitizedData, null, 2);
   const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -197,11 +211,13 @@ const handleImport = async () => {
       const text = await file.text();
       const importedProperties = JSON.parse(text);
 
-      if (!Array.isArray(importedProperties)) {
+      // Safe array validation using helper function
+      const safeImportedProperties = getArray(importedProperties);
+      if (safeImportedProperties.length === 0 && importedProperties) {
         throw new Error('File không hợp lệ');
       }
 
-      const result = await importProperties(importedProperties);
+      const result = await importProperties(safeImportedProperties);
 
       toast({
         title: 'Nhập dữ liệu thành công',
@@ -224,8 +240,8 @@ const handleImport = async () => {
   input.click();
 };
 
-  // Use searchResults if available, otherwise use properties
-const currentProperties = isSearchMode ? searchResults : properties;
+  // Use searchResults if available, otherwise use properties with type safety
+const currentProperties = getArray(isSearchMode ? searchResults : properties);
 
   const formatCurrency = (amount: number | null | undefined) => {
     if (!amount) return 'Chưa cập nhật';

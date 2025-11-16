@@ -6,6 +6,13 @@ import SearchAutocomplete from './SearchAutocomplete';
 import MarkerCluster from './MarkerCluster';
 import OptimizedHeatmap from './OptimizedHeatmap'; // NEW: High-performance canvas-based heatmap
 import 'mapbox-gl/dist/mapbox-gl.css';
+import {
+  getArray,
+  getString,
+  getNumber,
+  isValidCoordinateArray,
+  isValidAmenity
+} from '@/lib/typeSafety';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
 
@@ -175,18 +182,7 @@ export default function MapView({
     );
   }
 
-  // Helper function to validate coordinate array
-  function isValidCoordinateArray(coords: number[][]): boolean {
-    return (
-      Array.isArray(coords) &&
-      coords.length > 0 &&
-      coords.every(coord =>
-        Array.isArray(coord) &&
-        coord.length >= 2 &&
-        isValidCoordinate(coord[0], coord[1])
-      )
-    );
-  }
+  // Use the imported type safety helper instead
 
   // Performance throttling function
   const throttledUpdate = (callback: () => void, delay: number = 300) => {
@@ -730,15 +726,17 @@ export default function MapView({
           }
         });
       } else {
-        features.push(...data.filter((item: any) => item.lat && item.lng).map((item: any) => ({
+        // Safe array operations using helper functions
+        const safeData = getArray(data).filter((item: any) => item.lat && item.lng);
+        features.push(...safeData.map((item: any) => ({
           type: 'Feature',
           geometry: {
             type: 'Point',
-            coordinates: [item.lng, item.lat]
+            coordinates: [getNumber(item.lng), getNumber(item.lat)]
           },
           properties: {
-            name: item.name,
-            layer
+            name: getString(item.name, 'Không xác định'),
+            layer: getString(layer)
           }
         })));
       }
