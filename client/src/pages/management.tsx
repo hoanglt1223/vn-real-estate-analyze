@@ -27,12 +27,16 @@ import {
 
 // Helper function for property display validation (more lenient than isValidProperty)
 const isValidPropertyForDisplay = (property: any): boolean => {
-  return (
+  // Debug logging to see what properties we're getting
+  console.log('Checking property:', property);
+  const isValid = (
     property &&
     property.id !== undefined &&
     property.id !== null &&
     (typeof property.id === 'string' || typeof property.id === 'number')
   );
+  console.log('Is valid:', isValid, 'Property ID:', property?.id, 'Type:', typeof property?.id);
+  return isValid;
 };
 
 export default function ManagementPage() {
@@ -48,6 +52,12 @@ export default function ManagementPage() {
   });
 
   const displayProperties = getArray(searchResults || properties);
+
+  // Debug: Log the original data
+  console.log('Original properties data:', properties);
+  console.log('Search results data:', searchResults);
+  console.log('Display properties count:', displayProperties.length);
+  console.log('Display properties sample:', displayProperties.slice(0, 2));
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<PropertyAnalysis> }) => {
