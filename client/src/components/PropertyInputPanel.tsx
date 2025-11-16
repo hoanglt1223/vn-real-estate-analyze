@@ -27,16 +27,16 @@ export default function PropertyInputPanel({
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <MapPin className="w-5 h-5" />
+      <CardHeader className="pb-3 sm:pb-6">
+        <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+          <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
           Thông Tin Khu Đất
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="lat" data-testid="label-latitude">Vĩ độ (Latitude)</Label>
+            <Label htmlFor="lat" data-testid="label-latitude" className="text-sm">Vĩ độ (Latitude)</Label>
             <Input
               id="lat"
               name="lat"
@@ -44,10 +44,11 @@ export default function PropertyInputPanel({
               step="any"
               placeholder="10.8231"
               data-testid="input-latitude"
+              className="text-sm"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="lng" data-testid="label-longitude">Kinh độ (Longitude)</Label>
+            <Label htmlFor="lng" data-testid="label-longitude" className="text-sm">Kinh độ (Longitude)</Label>
             <Input
               id="lng"
               name="lng"
@@ -55,32 +56,33 @@ export default function PropertyInputPanel({
               step="any"
               placeholder="106.6297"
               data-testid="input-longitude"
+              className="text-sm"
             />
           </div>
-          <Button type="submit" className="w-full" data-testid="button-submit-coordinates">
+          <Button type="submit" className="w-full text-sm" size="sm" data-testid="button-submit-coordinates">
             Định Vị
           </Button>
         </form>
 
         {area && area > 0 && (
-          <div className="pt-4 border-t space-y-3">
+          <div className="pt-3 sm:pt-4 border-t space-y-2 sm:space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Ruler className="w-4 h-4" />
-                <span>Diện tích</span>
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                <Ruler className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="truncate">Diện tích</span>
               </div>
-              <span className="font-semibold" data-testid="text-area">
+              <span className="font-semibold text-xs sm:text-sm" data-testid="text-area">
                 {area.toLocaleString('vi-VN')} m²
               </span>
             </div>
 
             {orientation && (
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Compass className="w-4 h-4" />
-                  <span>Hướng đất</span>
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                  <Compass className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="truncate">Hướng đất</span>
                 </div>
-                <span className="font-semibold" data-testid="text-orientation">
+                <span className="font-semibold text-xs sm:text-sm" data-testid="text-orientation">
                   {orientation}
                 </span>
               </div>
@@ -88,11 +90,11 @@ export default function PropertyInputPanel({
 
             {frontageCount !== undefined && (
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Home className="w-4 h-4" />
-                  <span>Số mặt tiền</span>
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                  <Home className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="truncate">Số mặt tiền</span>
                 </div>
-                <span className="font-semibold" data-testid="text-frontage">
+                <span className="font-semibold text-xs sm:text-sm" data-testid="text-frontage">
                   {frontageCount}
                 </span>
               </div>

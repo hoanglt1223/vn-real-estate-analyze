@@ -406,9 +406,9 @@ export default function AnalysisPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      <div className="border-b bg-background p-2 flex items-center justify-between flex-wrap gap-2">
-        <h1 className="text-lg font-semibold truncate">Phân Tích Bất Động Sản</h1>
-        <div className="flex items-center gap-1 sm:gap-2">
+      <div className="border-b bg-background px-2 py-3 sm:px-4 flex items-center justify-between flex-wrap gap-2">
+        <h1 className="text-base sm:text-lg font-semibold truncate">Phân Tích Bất Động Sản</h1>
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <Button
             asChild
             variant="ghost"
@@ -436,9 +436,9 @@ export default function AnalysisPage() {
       </div>
       
       <div className="flex-1 flex overflow-hidden">
-        <div className="hidden md:block w-72 lg:w-80 xl:w-96 border-r bg-background">
+        <div className="hidden md:block w-64 lg:w-72 xl:w-80 2xl:w-96 border-r bg-background">
           <ScrollArea className="h-full">
-            <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+            <div className="p-3 lg:p-4 xl:p-6 space-y-3 lg:space-y-4 xl:space-y-6">
               <PropertyInputPanel
                 area={propertyData.area}
                 orientation={propertyData.orientation}
@@ -527,7 +527,7 @@ export default function AnalysisPage() {
                   <TabsTrigger value="amenities" className="text-xs sm:text-sm truncate">Tiện ích</TabsTrigger>
                   <TabsTrigger value="risk" className="text-xs sm:text-sm truncate">Rủi ro</TabsTrigger>
                 </TabsList>
-                <ScrollArea className="h-[50vh] min-h-[400px] max-h-[70vh]">
+                <ScrollArea className="h-[45vh] min-h-[300px] max-h-[60vh] sm:h-[50vh] sm:min-h-[400px] sm:max-h-[70vh]">
                   <TabsContent value="analysis" className="p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 md:space-y-4">
                     <AIAnalysisCard
                       scores={analysisResults.aiAnalysis.scores}
@@ -555,9 +555,9 @@ export default function AnalysisPage() {
         </div>
 
         {analysisResults && (
-          <div className="hidden md:block w-72 lg:w-80 xl:w-96 2xl:w-[448px] border-l bg-background">
+          <div className="hidden md:block w-64 lg:w-72 xl:w-80 2xl:w-96 border-l bg-background">
             <ScrollArea className="h-full">
-              <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6">
+              <div className="p-3 lg:p-4 xl:p-6 space-y-3 lg:space-y-4 xl:space-y-6">
                 <AIAnalysisCard
                   scores={analysisResults.aiAnalysis.scores}
                   scoreExplanations={analysisResults.aiAnalysis.scoreExplanations}

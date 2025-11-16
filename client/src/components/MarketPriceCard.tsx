@@ -50,54 +50,54 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
 
   return (
     <Card className="w-full">
-      <CardHeader>
+      <CardHeader className="pb-3 sm:pb-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <DollarSign className="w-5 h-5" />
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
             Giá Thị Trường
           </CardTitle>
           {data.trend && (
-            <Badge variant={data.trend === 'up' ? 'default' : data.trend === 'down' ? 'destructive' : 'secondary'}>
+            <Badge variant={data.trend === 'up' ? 'default' : data.trend === 'down' ? 'destructive' : 'secondary'} className="text-xs">
               {data.trend === 'up' ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
               {data.trend === 'up' ? 'Tăng' : data.trend === 'down' ? 'Giảm' : 'Ổn định'}
             </Badge>
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 md:gap-3">
           <div className="space-y-1 min-w-0">
-            <p className="text-xs text-muted-foreground">Thấp nhất</p>
-            <p className="text-sm sm:text-lg font-bold break-words" data-testid="text-price-min">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Thấp nhất</p>
+            <p className="text-xs sm:text-sm md:text-lg font-bold break-words" data-testid="text-price-min">
               {formatPrice(data.min)}
             </p>
           </div>
           <div className="space-y-1 min-w-0">
-            <p className="text-xs text-muted-foreground">Trung bình</p>
-            <p className="text-sm sm:text-lg font-bold text-primary break-words" data-testid="text-price-avg">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Trung bình</p>
+            <p className="text-xs sm:text-sm md:text-lg font-bold text-primary break-words" data-testid="text-price-avg">
               {formatPrice(data.avg)}
             </p>
           </div>
           <div className="space-y-1 min-w-0">
-            <p className="text-xs text-muted-foreground">Cao nhất</p>
-            <p className="text-sm sm:text-lg font-bold break-words" data-testid="text-price-max">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Cao nhất</p>
+            <p className="text-xs sm:text-sm md:text-lg font-bold break-words" data-testid="text-price-max">
               {formatPrice(data.max)}
             </p>
           </div>
         </div>
 
         {data.pricePerSqm != null && (
-          <div className="p-3 rounded-lg bg-muted/50">
+          <div className="p-2 sm:p-3 rounded-lg bg-muted/50">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Giá trung bình/m²</span>
-              <span className="text-lg font-bold text-primary" data-testid="text-price-per-sqm">
+              <span className="text-xs sm:text-sm text-muted-foreground">Giá trung bình/m²</span>
+              <span className="text-sm sm:text-base md:text-lg font-bold text-primary" data-testid="text-price-per-sqm">
                 {formatPricePerSqm(getNumber(data.pricePerSqm))}
               </span>
             </div>
           </div>
         )}
 
-        <div className="h-28 sm:h-32 md:h-40 min-h-[112px]">
+        <div className="h-24 sm:h-28 md:h-32 lg:h-40 min-h-[96px] sm:min-h-[112px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
               <XAxis

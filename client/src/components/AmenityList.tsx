@@ -293,62 +293,64 @@ export default function AmenityList({ amenities = [], onAmenityClick }: AmenityL
 
   return (
     <Card className="w-full">
-      <CardHeader>
+      <CardHeader className="pb-3 sm:pb-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Tiện Ích Gần Nhất</CardTitle>
-          <Badge variant="secondary" data-testid="badge-amenity-count">
+          <CardTitle className="text-base sm:text-lg">Tiện Ích Gần Nhất</CardTitle>
+          <Badge variant="secondary" className="text-xs" data-testid="badge-amenity-count">
             {safeAmenities.length} địa điểm
           </Badge>
         </div>
       </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[50vh] max-h-[500px] min-h-[350px] pr-2 sm:pr-4">
-          <div className="space-y-4 sm:space-y-6">
+      <CardContent className="px-3 sm:px-6">
+        <ScrollArea className="h-[40vh] max-h-[400px] min-h-[300px] sm:h-[50vh] sm:max-h-[500px] sm:min-h-[350px] pr-2 sm:pr-4">
+          <div className="space-y-3 sm:space-y-4 md:space-y-6">
             {Object.entries(groupedAmenities).map(([category, items]) => (
-              <div key={category} className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold flex-wrap">
-                  {categoryIcons[category] || <MapPin className="w-4 h-4" />}
+              <div key={category} className="space-y-2 sm:space-y-3">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold flex-wrap">
+                  <div className="scale-90 sm:scale-100">
+                    {categoryIcons[category] || <MapPin className="w-4 h-4" />}
+                  </div>
                   <span className="truncate">{categoryNames[category] || category}</span>
-                  <Badge variant="outline" className="ml-auto shrink-0">
+                  <Badge variant="outline" className="ml-auto shrink-0 text-[10px] sm:text-xs">
                     {getArray(items).length}
                   </Badge>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   {getArray(items).map((amenity) => {
                     const typeLabel = getTypeLabel(amenity);
 
                     return (
                       <div
                         key={getString(amenity.id, Math.random().toString())}
-                        className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-md hover-elevate active-elevate-2 cursor-pointer border"
+                        className="flex items-start gap-1.5 sm:gap-2 md:gap-3 p-1.5 sm:p-2 md:p-3 rounded-md hover-elevate active-elevate-2 cursor-pointer border"
                         onClick={() => isValidAmenity(amenity) && onAmenityClick?.(amenity)}
                         data-testid={`amenity-${getString(amenity.id)}`}
                       >
-                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                            <p className="text-sm font-medium truncate">
+                            <p className="text-xs sm:text-sm font-medium truncate">
                               {getString(amenity.name, 'Không xác định')}
                             </p>
                             {amenity.isChain && (
-                              <Badge variant="secondary" className="text-xs px-1 py-0.5 shrink-0">
-                                <Star className="w-3 h-3 mr-1" />
+                              <Badge variant="secondary" className="text-[10px] px-1 py-0.5 shrink-0">
+                                <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
                                 <span className="hidden sm:inline">Chuỗi</span>
                                 <span className="sm:hidden">C</span>
                               </Badge>
                             )}
                           </div>
                           {typeLabel && (
-                            <p className="text-xs text-primary font-medium mt-0.5 truncate">
+                            <p className="text-[10px] sm:text-xs text-primary font-medium mt-0.5 truncate">
                               {typeLabel}
                             </p>
                           )}
-                          <div className="flex items-center gap-2 sm:gap-3 mt-1 flex-wrap">
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                              <Clock className="w-3 h-3 shrink-0" />
+                          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 mt-1 flex-wrap">
+                            <div className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
+                              <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
                               {getNumber(amenity.walkTime, 0)} phút
                             </div>
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
                               ({getNumber(amenity.distance, 0) >= 1000
                                 ? `${(getNumber(amenity.distance, 0) / 1000).toFixed(1)} km`
                                 : `${getNumber(amenity.distance, 0)} m`})

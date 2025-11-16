@@ -2,7 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Brain, CheckCircle2, XCircle, AlertCircle, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Brain, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp, Expand, Minimize2 } from 'lucide-react';
 import { useState } from 'react';
 import { getNumber } from '@/lib/typeSafety';
 
@@ -38,6 +39,7 @@ export default function AIAnalysisCard({
   summary
 }: AIAnalysisCardProps) {
   const [isExplanationsOpen, setIsExplanationsOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   if (!scores) return null;
 
   const getScoreColor = (score: number) => {
@@ -86,46 +88,82 @@ export default function AIAnalysisCard({
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Brain className="w-5 h-5" />
-          Phân Tích AI
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex flex-col items-center gap-4 p-6 bg-muted rounded-lg">
-          <div className="relative w-32 h-32">
-            <svg className="w-32 h-32 transform -rotate-90">
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                className="text-muted-foreground/20"
-              />
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                strokeDasharray={`${2 * Math.PI * 56}`}
-                strokeDashoffset={`${2 * Math.PI * 56 * (1 - scores.overall / 100)}`}
-                className={getScoreColor(scores.overall)}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className={`text-4xl font-bold ${getScoreColor(scores.overall)}`} data-testid="text-overall-score">
-                {scores.overall}
-              </span>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">Điểm Tổng Quan</p>
+      <CardHeader className="pb-3 sm:pb-6">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <Brain className="w-4 h-4 sm:w-5 sm:h-5" />
+            Phân Tích AI
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="h-8 px-2 text-xs sm:text-sm sm:hidden"
+            data-testid="button-expand-card"
+          >
+            {isExpanded ? <Minimize2 className="w-3 h-3" /> : <Expand className="w-3 h-3" />}
+            <span className="ml-1">{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+          </Button>
         </div>
+      </CardHeader>
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <CollapsibleContent>
+          <CardContent className="space-y-4 sm:space-y-6 px-3 sm:px-6">
+          <div className="flex flex-col items-center gap-3 sm:gap-4 p-3 sm:p-6 bg-muted rounded-lg">
+            <div className="relative w-24 h-24 sm:w-32 sm:h-32">
+              <svg className="w-24 h-24 sm:w-32 sm:h-32 transform -rotate-90">
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  className="text-muted-foreground/20 sm:hidden"
+                />
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="56"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="none"
+                  className="text-muted-foreground/20 hidden sm:block"
+                />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  strokeDasharray={`${2 * Math.PI * 40}`}
+                  strokeDashoffset={`${2 * Math.PI * 40 * (1 - scores.overall / 100)}`}
+                  className={getScoreColor(scores.overall)}
+                  strokeLinecap="round"
+                  sm:hidden
+                />
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="56"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="none"
+                  strokeDasharray={`${2 * Math.PI * 56}`}
+                  strokeDashoffset={`${2 * Math.PI * 56 * (1 - scores.overall / 100)}`}
+                  className={`${getScoreColor(scores.overall)} hidden sm:block`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className={`text-2xl sm:text-4xl font-bold ${getScoreColor(scores.overall)}`} data-testid="text-overall-score">
+                  {scores.overall}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground">Điểm Tổng Quan</p>
+          </div>
 
         <div className="space-y-4">
           {[
@@ -210,7 +248,9 @@ export default function AIAnalysisCard({
             </p>
           </div>
         )}
-      </CardContent>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }
