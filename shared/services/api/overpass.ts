@@ -172,7 +172,7 @@ export async function fetchAmenities(
   radius: number,
   categories: string[],
   includeSmallShops: boolean = false,
-  maxResults?: number = 1000
+  maxResults: number = 1000
 ): Promise<any[]> {
   // Enhanced logging for debugging
   console.log(`fetchAmenities called with:`, {

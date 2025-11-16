@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, handleOptions } from './lib/cors.js';
-import { handleError } from './lib/error-handler.js';
+import { setCorsHeaders, handleOptions } from './_lib/cors.js';
+import { handleError } from './_lib/error-handler.js';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import {
@@ -17,9 +17,9 @@ import {
   type InsertPropertyAnalysis
 } from '../shared/services/api/services.js';
 import { fetchAmenities, fetchInfrastructure } from '../shared/services/api/overpass.js';
-import { AuthService } from '../shared/services/auth.service';
-import { FileStorageService } from '../shared/services/file-storage.service';
-import { CreateUserInput, LoginInput } from '../shared/types/user.types';
+import { AuthService } from '../shared/services/auth.service.js';
+import { FileStorageService } from '../shared/services/file-storage.service.js';
+import { CreateUserInput, LoginInput } from '../shared/types/user.types.js';
 
 const store = new Map<string, PropertyAnalysis>();
 

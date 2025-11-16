@@ -364,8 +364,12 @@ export class FileStorageService {
 
   // Helper methods
   private static matchesFilters(property: PropertyDetails, filters: PropertyFilters): boolean {
-    if (filters.propertyType && filters.propertyType !== 'all' &&
-        (Array.isArray(filters.propertyType) ? !filters.propertyType.includes(property.propertyType) : filters.propertyType !== property.propertyType)) {
+    if (filters.propertyType && !Array.isArray(filters.propertyType) &&
+        filters.propertyType !== 'all' && filters.propertyType !== property.propertyType) {
+      return false;
+    }
+    if (filters.propertyType && Array.isArray(filters.propertyType) &&
+        !filters.propertyType.includes(property.propertyType)) {
       return false;
     }
 
