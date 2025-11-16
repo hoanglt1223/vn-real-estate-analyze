@@ -122,7 +122,7 @@ export default function ManagementPage() {
 
     toast({
       title: 'Tìm kiếm hoàn tất',
-      description: `Tìm thấy ${results.length} bất động sản phù hợp`,
+      description: `Tìm thấy ${getArray(results).length} bất động sản phù hợp`,
     });
   } catch (error: any) {
     toast({
@@ -194,7 +194,7 @@ const handleExport = () => {
 
   toast({
     title: 'Đã xuất',
-    description: `Đã xuất ${sanitizedData.length} bất động sản`,
+    description: `Đã xuất ${getArray(sanitizedData).length} bất động sản`,
   });
 };
 
@@ -327,8 +327,8 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
               <h1 className="text-2xl font-bold">Quản Lý Bất Động Sản</h1>
               <p className="text-muted-foreground text-sm">
                 {isSearchMode
-                  ? `Tìm thấy ${displayProperties.length} bất động sản`
-                  : `Hiển thị ${displayProperties.length} / ${properties?.length || 0} bất động sản`
+                  ? `Tìm thấy ${getArray(displayProperties).length} bất động sản`
+                  : `Hiển thị ${getArray(displayProperties).length} / ${getArray(properties).length} bất động sản`
                 }
               </p>
             </div>

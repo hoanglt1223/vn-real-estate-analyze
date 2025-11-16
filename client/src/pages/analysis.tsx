@@ -368,7 +368,7 @@ export default function AnalysisPage() {
               </p>
             </div>
 
-            {propertyData.area > 0 && propertyData.coordinates.length > 0 && (
+            {propertyData.area > 0 && getArray(propertyData.coordinates).length > 0 && (
               <Button
                 onClick={handleAnalyze}
                 disabled={isAnalyzing}
@@ -481,7 +481,7 @@ export default function AnalysisPage() {
                 </p>
               </div>
 
-              {propertyData.area > 0 && propertyData.coordinates.length > 0 && (
+              {propertyData.area > 0 && getArray(propertyData.coordinates).length > 0 && (
                 <Button
                   onClick={handleAnalyze}
                   disabled={isAnalyzing}
