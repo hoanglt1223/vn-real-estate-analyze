@@ -396,7 +396,7 @@ export default function AnalysisPage() {
 
   // Mobile floating action button
   const MobileFAB = () => (
-    <div className="md:hidden fixed bottom-4 right-4 z-[110]" style={{ zIndex: showLeftSidebar || showRightSidebar ? 50 : 110 }}>
+    <div className="lg:hidden fixed bottom-4 right-4 z-[110]" style={{ zIndex: showLeftSidebar || showRightSidebar ? 50 : 110 }}>
       <Button
         onClick={() => setShowMobileFilters(true)}
         size="lg"
@@ -413,7 +413,7 @@ export default function AnalysisPage() {
         <h1 className="text-base sm:text-lg font-semibold truncate">Phân Tích Bất Động Sản</h1>
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           {/* Mobile sidebar controls */}
-          <div className="flex gap-1 md:hidden lg:hidden">
+          <div className="flex gap-1 lg:hidden">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -455,28 +455,6 @@ export default function AnalysisPage() {
             )}
           </div>
 
-          {/* Tablet sidebar controls */}
-          <div className="hidden md:flex lg:hidden gap-1">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={() => setShowRightSidebar(!showRightSidebar)}
-                    variant={showRightSidebar ? "default" : "outline"}
-                    size="sm"
-                    className="h-8 px-2"
-                    data-testid="button-right-sidebar-tablet"
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>Kết quả phân tích</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-
           <Button
             asChild
             variant="ghost"
@@ -504,9 +482,9 @@ export default function AnalysisPage() {
       </div>
       
       <div className="flex-1 flex overflow-hidden">
-        <div className={`${showLeftSidebar ? 'block' : 'hidden'} md:block w-64 md:w-72 lg:w-80 xl:w-96 2xl:w-[448px] border-r bg-background absolute md:relative z-[100] h-full bg-background md:bg-transparent`}>
+        <div className={`${showLeftSidebar ? 'block' : 'hidden'} lg:block w-64 lg:w-80 xl:w-96 border-r bg-background absolute lg:relative z-[100] h-full bg-background lg:bg-transparent`}>
           <ScrollArea className="h-full">
-            <div className="flex items-center justify-between md:hidden p-3 border-b">
+            <div className="flex items-center justify-between lg:hidden p-3 border-b">
               <h3 className="text-sm font-medium">Bộ lọc & Công cụ</h3>
               <Button
                 variant="ghost"
@@ -517,7 +495,7 @@ export default function AnalysisPage() {
                 <X className="w-4 h-4" />
               </Button>
             </div>
-            <div className="p-3 md:p-4 lg:p-5 xl:p-6 space-y-3 md:space-y-4 lg:space-y-5 xl:space-y-6">
+            <div className="p-3 lg:p-6 space-y-3 lg:space-y-6">
               <PropertyInputPanel
                 area={propertyData.area}
                 orientation={propertyData.orientation}
@@ -599,7 +577,7 @@ export default function AnalysisPage() {
           </div>
 
           {analysisResults && (
-            <div className="lg:hidden md:block">
+            <div className="lg:hidden">
               <Tabs defaultValue="analysis" className="w-full">
                 <TabsList className="w-full rounded-none h-12 grid grid-cols-3">
                   <TabsTrigger value="analysis" className="text-xs sm:text-sm truncate">Phân tích</TabsTrigger>
@@ -607,7 +585,7 @@ export default function AnalysisPage() {
                   <TabsTrigger value="risk" className="text-xs sm:text-sm truncate">Rủi ro</TabsTrigger>
                 </TabsList>
                 <ScrollArea className="h-[45vh] min-h-[300px] max-h-[60vh] sm:h-[50vh] sm:min-h-[400px] sm:max-h-[70vh]">
-                  <TabsContent value="analysis" className="p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 md:space-y-4">
+                  <TabsContent value="analysis" className="p-4 space-y-4">
                     <AIAnalysisCard
                       scores={analysisResults.aiAnalysis.scores}
                       scoreExplanations={analysisResults.aiAnalysis.scoreExplanations}
@@ -617,14 +595,14 @@ export default function AnalysisPage() {
                     />
                     <MarketPriceCard data={analysisResults.marketData} />
                   </TabsContent>
-                  <TabsContent value="amenities" className="p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 md:space-y-4">
+                  <TabsContent value="amenities" className="p-4 space-y-4">
                     <AmenityStatistics
                       amenities={getAllAmenities()}
                       onAmenityClick={handleAmenityClick}
                     />
                     <AmenityList amenities={getAllAmenities()} />
                   </TabsContent>
-                  <TabsContent value="risk" className="p-2 sm:p-3 md:p-4">
+                  <TabsContent value="risk" className="p-4">
                     <RiskAssessmentCard risks={analysisResults.risks} overallRiskLevel={analysisResults.overallRiskLevel} />
                   </TabsContent>
                 </ScrollArea>
@@ -634,9 +612,9 @@ export default function AnalysisPage() {
         </div>
 
         {analysisResults && (
-          <div className={`${showRightSidebar ? 'block' : 'hidden'} md:hidden lg:block w-64 md:w-72 lg:w-80 xl:w-96 2xl:w-[448px] border-l bg-background absolute md:relative right-0 z-[100] h-full bg-background md:bg-transparent`}>
+          <div className={`${showRightSidebar ? 'block' : 'hidden'} lg:block w-64 lg:w-80 xl:w-96 border-l bg-background absolute lg:relative right-0 z-[100] h-full bg-background lg:bg-transparent`}>
             <ScrollArea className="h-full">
-              <div className="flex items-center justify-between md:hidden lg:hidden p-3 border-b">
+              <div className="flex items-center justify-between lg:hidden p-3 border-b">
                 <h3 className="text-sm font-medium">Kết quả phân tích</h3>
                 <Button
                   variant="ghost"
@@ -647,7 +625,7 @@ export default function AnalysisPage() {
                   <X className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="p-3 md:p-4 lg:p-5 xl:p-6 space-y-3 md:space-y-4 lg:space-y-5 xl:space-y-6">
+              <div className="p-3 lg:p-6 space-y-3 lg:space-y-6">
                 <AIAnalysisCard
                   scores={analysisResults.aiAnalysis.scores}
                   scoreExplanations={analysisResults.aiAnalysis.scoreExplanations}
@@ -672,7 +650,7 @@ export default function AnalysisPage() {
       {/* Mobile sidebar overlays */}
       {(showLeftSidebar || showRightSidebar) && (
         <div
-          className="md:hidden fixed inset-0 bg-black/50 z-[90]"
+          className="lg:hidden fixed inset-0 bg-black/50 z-[90]"
           onClick={() => {
             setShowLeftSidebar(false);
             setShowRightSidebar(false);
