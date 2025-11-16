@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { FileStorageService, PropertyDetails } from './file-storage.service.js';
 
 export interface PropertyComparison {

@@ -27,7 +27,7 @@ import { FileStorageService } from '../shared/services/file-storage.service.js';
 import { blobStorageService } from '../shared/services/blob-storage.service.js';
 import { AdvancedSearchService } from '../shared/services/advanced-search.service.js';
 import { PropertyComparisonService } from '../shared/services/property-comparison.service.js';
-import { HistoricalPriceService } from '../shared/services/historical-price.service.js';
+import { HistoricalPriceService, type PricePoint } from '../shared/services/historical-price.service.js';
 import { ExportService } from '../shared/services/export.service.js';
 import { CreateUserInput, LoginInput } from '../shared/types/user.types.js';
 
@@ -1111,7 +1111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Scrape from each source
         for (const source of defaultSources) {
           try {
-            let pricePoints = [];
+            let pricePoints: PricePoint[] = [];
 
             switch (source) {
               case 'batdongsan':

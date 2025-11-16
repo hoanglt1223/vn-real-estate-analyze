@@ -1,4 +1,22 @@
-import { FileStorageService, PropertyDetails, PropertyFilters, SearchResult } from './file-storage.service.js';
+import { FileStorageService, PropertyDetails } from './file-storage.service.js';
+
+// Base property filters
+export interface PropertyFilters {
+  // Basic filters
+  propertyType?: string;
+  transactionType?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minArea?: number;
+  maxArea?: number;
+  province?: string;
+  district?: string;
+  ward?: string;
+
+  // Sort options (base)
+  sortBy?: 'createdAt' | 'area' | 'price' | 'views' | 'pricePerSqm' | 'relevance' | 'distance';
+  sortOrder?: 'asc' | 'desc';
+}
 
 export interface AdvancedSearchFilters extends PropertyFilters {
   // Geospatial filters
@@ -45,6 +63,15 @@ export interface AdvancedSearchQuery {
   };
 }
 
+export interface SearchResult {
+  properties: PropertyDetails[];
+  total: number;
+  limit: number;
+  offset: number;
+  page?: number;
+  totalPages?: number;
+}
+
 export interface AdvancedSearchResult extends SearchResult {
   query: AdvancedSearchQuery;
   filtersApplied: string[];
@@ -54,6 +81,7 @@ export interface AdvancedSearchResult extends SearchResult {
     location?: string[];
     price?: string[];
   };
+  error?: string; // Error message if search failed
 }
 
 export interface SavedSearch {

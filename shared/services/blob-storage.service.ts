@@ -64,16 +64,10 @@ export class BlobStorageService {
       const pathname = `properties/${propertyId}/${uniqueFilename}`;
 
       // Upload to Vercel Blob
-      const blob = await put(pathname, new Uint8Array(fileData), {
+      const blob = await put(pathname, Buffer.from(fileData), {
         access: 'public',
         token: process.env.BLOB_READ_WRITE_TOKEN,
-        contentType: mimeType,
-        metadata: {
-          propertyId,
-          originalName,
-          uploadedAt: new Date().toISOString(),
-          ...options
-        }
+        contentType: mimeType
       });
 
       const uploadedFile: UploadedFile = {
@@ -144,13 +138,13 @@ export class BlobStorageService {
         url: blob.url,
         blobUrl: blob.url,
         filename: blob.pathname,
-        originalName: blob.metadata?.originalName || blob.pathname,
+        originalName: blob.pathname, // Using pathname as fallback since metadata not available
         size: blob.size,
-        mimeType: blob.contentType,
-        uploadedAt: blob.uploadedAt,
+        mimeType: 'application/octet-stream', // Default since contentType not available
+        uploadedAt: new Date(), // Current date since uploadedAt not available
         propertyId,
-        isPrimary: blob.metadata?.isPrimary,
-        caption: blob.metadata?.caption
+        isPrimary: false, // Default since metadata not available
+        caption: undefined // Default since metadata not available
       }));
 
     } catch (error: any) {

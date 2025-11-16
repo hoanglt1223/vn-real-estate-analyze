@@ -63,7 +63,7 @@ const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
  * Security middleware cho Vercel Functions
  */
 export class SecurityMiddleware {
-  private static config = DEFAULT_SECURITY_CONFIG;
+  public static config = DEFAULT_SECURITY_CONFIG;
   private static isKVAvailable = false;
 
   static {
@@ -328,9 +328,10 @@ export class SecurityMiddleware {
     }
 
     try {
-      const keys = await kv.keys('rate-limit:*');
+      // Since kv.keys() is not available, we'll just return config info
+      // without counting active rate limits
       return {
-        activeRateLimits: keys.length,
+        activeRateLimits: 'N/A - kv.keys() not available',
         config: this.config,
         kvAvailable: true
       };

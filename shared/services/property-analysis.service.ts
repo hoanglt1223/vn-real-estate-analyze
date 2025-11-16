@@ -10,7 +10,7 @@ export interface PropertyAnalysisExtended {
   id: string;
   coordinates: number[][];
   area: number;
-  orientation: string;
+  orientation: number;
   frontageCount: number;
   center: { lat: number; lng: number };
   amenities?: any[];

@@ -806,7 +806,7 @@ export class ExportService {
       ${category.items && category.items.length > 0 ? `
         <table class="data-table">
           <tr><th>Tên tiện ích</th><th>Khoảng cách</th></tr>
-          ${category.items.slice(0, 10).map(item => `
+          ${category.items.slice(0, 10).map((item: any) => `
             <tr><td>${item.name || 'N/A'}</td><td>${item.distance || 'N/A'}m</td></tr>
           `).join('')}
         </table>

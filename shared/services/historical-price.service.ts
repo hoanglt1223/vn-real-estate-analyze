@@ -459,15 +459,15 @@ export class HistoricalPriceService {
     try {
       // Store in KV cache with location-based keys
       for (const point of pricePoints) {
-        const locationKey = `price:${point.province}:${point.district}:${point.propertyType}`;
+        const locationKey = `price:${point.location.province}:${point.location.district}:${point.propertyType}`;
         const dailyKey = `price:daily:${new Date().toISOString().split('T')[0]}`;
 
         // Store in location bucket
-        await kv.lpush(locationKey, JSON.stringify(point));
+        await kv.set(locationKey, JSON.stringify(point));
         await kv.expire(locationKey, this.CACHE_TTL * 24); // 24 hours
 
         // Store in daily bucket
-        await kv.lpush(dailyKey, JSON.stringify(point));
+        await kv.set(dailyKey, JSON.stringify(point));
         await kv.expire(dailyKey, this.DATA_RETENTION_DAYS * 24 * 3600);
 
         // Store individual point for detailed queries
@@ -502,7 +502,8 @@ export class HistoricalPriceService {
       const stats = await this.calculateLocationStats(province, district, propertyType, period);
 
       // Cache the result
-      await kv.setex(locationKey, this.CACHE_TTL, JSON.stringify(stats));
+      await kv.set(locationKey, JSON.stringify(stats));
+      await kv.expire(locationKey, this.CACHE_TTL);
 
       return stats;
     } catch (error) {
@@ -599,7 +600,7 @@ export class HistoricalPriceService {
 
       // Add to user's alerts list
       const userAlertsKey = `alerts:user:${priceAlert.userId}`;
-      await kv.lpush(userAlertsKey, priceAlert.id);
+      await kv.set(userAlertsKey, priceAlert.id);
 
       return priceAlert;
     } catch (error) {
