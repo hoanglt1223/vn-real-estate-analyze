@@ -13,7 +13,8 @@ import InfrastructureLayer from '@/components/InfrastructureLayer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Play, FolderOpen, Settings, X, MapPin } from 'lucide-react';
+import { Play, FolderOpen, Settings, X, MapPin, Filter, BarChart3, Brain } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { analyzeProperty } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { generatePDF } from '@/lib/pdfExport';
@@ -45,6 +46,8 @@ export default function AnalysisPage() {
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false); // RE-ENABLED with optimized canvas heatmap
+  const [showLeftSidebar, setShowLeftSidebar] = useState(false);
+  const [showRightSidebar, setShowRightSidebar] = useState(false);
 
   // Performance optimization: Request cancellation
   const analysisRequestRef = useRef<AbortController>();
@@ -393,7 +396,7 @@ export default function AnalysisPage() {
 
   // Mobile floating action button
   const MobileFAB = () => (
-    <div className="md:hidden fixed bottom-4 right-4 z-[150]">
+    <div className="md:hidden fixed bottom-4 right-4 z-[110]" style={{ zIndex: showLeftSidebar || showRightSidebar ? 50 : 110 }}>
       <Button
         onClick={() => setShowMobileFilters(true)}
         size="lg"
@@ -409,6 +412,49 @@ export default function AnalysisPage() {
       <div className="border-b bg-background px-2 py-3 sm:px-4 flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-base sm:text-lg font-semibold truncate">Phân Tích Bất Động Sản</h1>
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {/* Mobile sidebar controls */}
+          <div className="flex gap-1 sm:hidden">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => setShowLeftSidebar(!showLeftSidebar)}
+                    variant={showLeftSidebar ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 px-2"
+                    data-testid="button-left-sidebar"
+                  >
+                    <Filter className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Bộ lọc và công cụ</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {analysisResults && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => setShowRightSidebar(!showRightSidebar)}
+                      variant={showRightSidebar ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 px-2"
+                      data-testid="button-right-sidebar"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Kết quả phân tích</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+
           <Button
             asChild
             variant="ghost"
@@ -436,8 +482,19 @@ export default function AnalysisPage() {
       </div>
       
       <div className="flex-1 flex overflow-hidden">
-        <div className="hidden md:block w-64 lg:w-72 xl:w-80 2xl:w-96 border-r bg-background">
+        <div className={`${showLeftSidebar ? 'block' : 'hidden'} md:block w-64 lg:w-72 xl:w-80 2xl:w-96 border-r bg-background absolute md:relative z-[100] h-full bg-background md:bg-transparent`}>
           <ScrollArea className="h-full">
+            <div className="flex items-center justify-between md:hidden p-3 border-b">
+              <h3 className="text-sm font-medium">Bộ lọc & Công cụ</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowLeftSidebar(false)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
             <div className="p-3 lg:p-4 xl:p-6 space-y-3 lg:space-y-4 xl:space-y-6">
               <PropertyInputPanel
                 area={propertyData.area}
@@ -555,8 +612,19 @@ export default function AnalysisPage() {
         </div>
 
         {analysisResults && (
-          <div className="hidden md:block w-64 lg:w-72 xl:w-80 2xl:w-96 border-l bg-background">
+          <div className={`${showRightSidebar ? 'block' : 'hidden'} md:block w-64 lg:w-72 xl:w-80 2xl:w-96 border-l bg-background absolute md:relative right-0 z-[100] h-full bg-background md:bg-transparent`}>
             <ScrollArea className="h-full">
+              <div className="flex items-center justify-between md:hidden p-3 border-b">
+                <h3 className="text-sm font-medium">Kết quả phân tích</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowRightSidebar(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
               <div className="p-3 lg:p-4 xl:p-6 space-y-3 lg:space-y-4 xl:space-y-6">
                 <AIAnalysisCard
                   scores={analysisResults.aiAnalysis.scores}
@@ -579,6 +647,17 @@ export default function AnalysisPage() {
       </div>
 
       {/* Mobile components */}
+      {/* Mobile sidebar overlays */}
+      {(showLeftSidebar || showRightSidebar) && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/50 z-[90]"
+          onClick={() => {
+            setShowLeftSidebar(false);
+            setShowRightSidebar(false);
+          }}
+        />
+      )}
+
       <MobileFiltersOverlay />
       <MobileFAB />
     </div>
