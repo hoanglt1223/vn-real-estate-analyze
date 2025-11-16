@@ -1,18 +1,29 @@
 const API_BASE = '/api/app';
 
 export const API_ENDPOINTS = {
+  // Auth endpoints
+  authRegister: `${API_BASE}?action=auth-register`,
+  authLogin: `${API_BASE}?action=auth-login`,
+  authVerify: `${API_BASE}?action=auth-verify`,
+  authProfile: `${API_BASE}?action=auth-profile`,
+  authChangePassword: `${API_BASE}?action=auth-change-password`,
+
+  // Property endpoints
   analyzeProperty: `${API_BASE}?action=analyze-property`,
   analysis: (id: string) => `${API_BASE}?action=analysis&id=${id}`,
   recentAnalyses: (limit: number = 10) => `${API_BASE}?action=recent-analyses&limit=${limit}`,
-  propertiesList: `${API_BASE}?action=properties`,
-  propertiesUpdate: (id: string) => `${API_BASE}?action=properties&id=${id}`,
-  propertiesDelete: (id: string) => `${API_BASE}?action=properties&id=${id}`,
+  propertiesList: `${API_BASE}?action=properties-list`,
+  propertiesCreate: `${API_BASE}?action=properties-create`,
+  propertiesDetail: (id: string) => `${API_BASE}?action=properties-detail&id=${id}`,
+  propertiesUpdate: (id: string) => `${API_BASE}?action=properties-update`,
+  propertiesDelete: (id: string) => `${API_BASE}?action=properties-delete`,
+  propertiesSearch: `${API_BASE}?action=properties-search`,
+
+  // Location endpoints
   locationsSearch: (q: string) => `${API_BASE}?action=locations-search&q=${encodeURIComponent(q)}`,
   locationsGeocode: `${API_BASE}?action=locations-geocode`,
 
-  // New REST API endpoints
-  searchProperties: '/api/properties/search',
-  createComparison: '/api/comparisons',
+    createComparison: '/api/comparisons',
   getComparisons: (userId: string) => `/api/comparisons/${userId}`,
   deleteComparison: (id: string) => `/api/comparisons/${id}`,
   createNote: '/api/notes',
@@ -92,30 +103,194 @@ export async function getRecentAnalyses(limit: number = 10) {
   return response.json();
 }
 
-export async function listProperties() {
-  const response = await fetch(API_ENDPOINTS.propertiesList);
+export async function listProperties(filters?: {
+  type?: string[];
+  transactionType?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minArea?: number;
+  maxArea?: number;
+  location?: string;
+  province?: string;
+  district?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: string;
+  sortOrder?: string;
+}) {
+  let url = API_ENDPOINTS.propertiesList;
+
+  if (filters) {
+    const params = new URLSearchParams();
+    if (filters.type) params.set('type', filters.type.join(','));
+    if (filters.transactionType) params.set('transactionType', filters.transactionType);
+    if (filters.minPrice) params.set('minPrice', String(filters.minPrice));
+    if (filters.maxPrice) params.set('maxPrice', String(filters.maxPrice));
+    if (filters.minArea) params.set('minArea', String(filters.minArea));
+    if (filters.maxArea) params.set('maxArea', String(filters.maxArea));
+    if (filters.location) params.set('location', filters.location);
+    if (filters.province) params.set('province', filters.province);
+    if (filters.district) params.set('district', filters.district);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.offset) params.set('offset', String(filters.offset));
+    if (filters.sortBy) params.set('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+
+    if (params.toString()) {
+      url += '&' + params.toString();
+    }
+  }
+
+  const response = await fetch(url);
   if (!response.ok) throw new Error('Failed to fetch properties');
   return response.json();
 }
 
-export async function updateProperty(id: string, updates: any) {
-  const response = await fetch(API_ENDPOINTS.propertiesUpdate(id), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
+export async function createProperty(propertyData: any, token: string) {
+  const response = await fetch(API_ENDPOINTS.propertiesCreate, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(propertyData),
   });
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.message || 'Failed to update property');
+    throw new Error(error.error || 'Failed to create property');
   }
   return response.json();
 }
 
-export async function deleteProperty(id: string) {
-  const response = await fetch(API_ENDPOINTS.propertiesDelete(id), { method: 'DELETE' });
+export async function getProperty(id: string) {
+  const response = await fetch(API_ENDPOINTS.propertiesDetail(id));
+  if (!response.ok) throw new Error('Failed to fetch property');
+  return response.json();
+}
+
+export async function updateProperty(id: string, updates: any, token: string) {
+  const response = await fetch(API_ENDPOINTS.propertiesUpdate(id), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(updates),
+  });
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.message || 'Failed to delete property');
+    throw new Error(error.error || 'Failed to update property');
+  }
+  return response.json();
+}
+
+export async function deleteProperty(id: string, token: string) {
+  const response = await fetch(API_ENDPOINTS.propertiesDelete(id), {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete property');
+  }
+  return response.json();
+}
+
+export async function searchProperties(criteria: { query?: string; [key: string]: any }) {
+  const response = await fetch(API_ENDPOINTS.propertiesSearch, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(criteria),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to search properties');
+  }
+  return response.json();
+}
+
+// Auth functions
+export async function registerUser(userData: { email: string; password: string; name: string }) {
+  const response = await fetch(API_ENDPOINTS.authRegister, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to register');
+  }
+  return response.json();
+}
+
+export async function loginUser(credentials: { email: string; password: string }) {
+  const response = await fetch(API_ENDPOINTS.authLogin, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to login');
+  }
+  return response.json();
+}
+
+export async function verifyToken(token: string) {
+  const response = await fetch(API_ENDPOINTS.authVerify, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Invalid token');
+  }
+  return response.json();
+}
+
+export async function getProfile(token: string) {
+  const response = await fetch(API_ENDPOINTS.authProfile, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to get profile');
+  }
+  return response.json();
+}
+
+export async function updateProfile(token: string, updates: any) {
+  const response = await fetch(API_ENDPOINTS.authProfile, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(updates),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update profile');
+  }
+  return response.json();
+}
+
+export async function changePassword(token: string, passwords: { currentPassword: string; newPassword: string }) {
+  const response = await fetch(API_ENDPOINTS.authChangePassword, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(passwords),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to change password');
   }
   return response.json();
 }
@@ -141,29 +316,6 @@ export async function geocodeLocation(query: string) {
   return response.json();
 }
 
-// Advanced search
-export async function searchProperties(criteria: {
-  query?: string;
-  minScore?: number;
-  maxScore?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  minArea?: number;
-  maxArea?: number;
-  propertyType?: string;
-  sortBy?: 'date' | 'score' | 'price' | 'area';
-  sortOrder?: 'asc' | 'desc';
-  limit?: number;
-  offset?: number;
-}) {
-  const response = await fetch(API_ENDPOINTS.searchProperties, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(criteria),
-  });
-  if (!response.ok) throw new Error('Failed to search properties');
-  return response.json();
-}
 
 // Property comparisons
 export async function createPropertyComparison(data: {
