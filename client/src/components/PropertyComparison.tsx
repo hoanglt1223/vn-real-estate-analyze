@@ -19,6 +19,16 @@ import {
   safeMap
 } from '@/lib/typeSafety';
 
+// Helper function for property display validation (more lenient than isValidProperty)
+const isValidPropertyForDisplay = (property: any): boolean => {
+  return (
+    property &&
+    property.id !== undefined &&
+    property.id !== null &&
+    (typeof property.id === 'string' || typeof property.id === 'number')
+  );
+};
+
 interface PropertyComparisonProps {
   properties: PropertyAnalysis[];
   onPropertySelect?: (propertyIds: string[]) => void;
@@ -199,7 +209,7 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
       <CardContent>
         <ScrollArea className="h-[300px]">
           <div className="space-y-4">
-            {getArray(properties).filter(isValidProperty).map((property) => (
+            {getArray(properties).filter(isValidPropertyForDisplay).map((property) => (
               <div
                 key={getString(property.id)}
                 className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${

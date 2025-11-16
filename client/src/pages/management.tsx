@@ -25,6 +25,16 @@ import {
   safeMap
 } from '@/lib/typeSafety';
 
+// Helper function for property display validation (more lenient than isValidProperty)
+const isValidPropertyForDisplay = (property: any): boolean => {
+  return (
+    property &&
+    property.id !== undefined &&
+    property.id !== null &&
+    (typeof property.id === 'string' || typeof property.id === 'number')
+  );
+};
+
 export default function ManagementPage() {
   const { toast } = useToast();
   const [editingProperty, setEditingProperty] = useState<PropertyAnalysis | null>(null);
@@ -390,11 +400,7 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
 
               <ScrollArea className="h-[calc(100vh-200px)]">
                 {(() => {
-                  const validProperties = displayProperties.filter(property =>
-                    isValidProperty(property) &&
-                    property.id !== undefined &&
-                    property.id !== null
-                  );
+                  const validProperties = displayProperties.filter(isValidPropertyForDisplay);
 
                   if (validProperties.length === 0) {
                     return (
