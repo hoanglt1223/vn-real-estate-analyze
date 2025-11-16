@@ -7,8 +7,12 @@
   },
   "routes": [
     {
+      "src": "/api/app",
+      "dest": "/api/app"
+    },
+    {
       "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "dest": "/api/app"
     },
     {
       "src": "/(.*\\.(js|mjs|css|ico|svg|png|jpg|jpeg|gif|woff|woff2|ttf|eot))",
