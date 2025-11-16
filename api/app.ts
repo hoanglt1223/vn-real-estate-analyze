@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, handleOptions } from './_lib/cors.js';
 import { handleError } from './_lib/error-handler.js';
+import { applySecurity, SecurityMiddleware } from './_lib/security.middleware.js';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import {
@@ -19,6 +20,10 @@ import {
 import { fetchAmenities, fetchInfrastructure } from '../shared/services/api/overpass.js';
 import { AuthService } from '../shared/services/auth.service.js';
 import { FileStorageService } from '../shared/services/file-storage.service.js';
+import { blobStorageService } from '../shared/services/blob-storage.service.js';
+import { AdvancedSearchService } from '../shared/services/advanced-search.service.js';
+import { PropertyComparisonService } from '../shared/services/property-comparison.service.js';
+import { HistoricalPriceService } from '../shared/services/historical-price.service.js';
 import { CreateUserInput, LoginInput } from '../shared/types/user.types.js';
 
 const store = new Map<string, PropertyAnalysis>();
@@ -43,13 +48,59 @@ function listRecent(limit: number): PropertyAnalysis[] {
   return Array.from(store.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit);
 }
 
+// Helper functions for price formatting and analysis
+function formatCurrency(amount: number): string {
+  if (amount >= 1000000000) {
+    return `${(amount / 1000000000).toFixed(2)} tỷ VNĐ`;
+  } else if (amount >= 1000000) {
+    return `${(amount / 1000000).toFixed(0)} triệu VNĐ`;
+  } else {
+    return `${amount.toLocaleString('vi-VN')} VNĐ`;
+  }
+}
+
+function calculateMarketHeat(trends: any): 'hot' | 'warm' | 'cold' | 'stable' {
+  const trend6Months = trends.trends['6months'];
+  const changePercent = Math.abs(trend6Months.changePercent);
+  const confidence = trend6Months.confidence;
+
+  if (confidence > 0.8 && changePercent > 10) {
+    return trend6Months.trendDirection === 'up' ? 'hot' : 'cold';
+  } else if (confidence > 0.6 && changePercent > 5) {
+    return trend6Months.trendDirection === 'up' ? 'warm' : 'cold';
+  } else {
+    return 'stable';
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    setCorsHeaders(res);
+    // Apply security middleware
+    const securityResult = await applySecurity(req, res);
+    if (!securityResult.success) {
+      // Rate limit exceeded
+      return res.status(429).json({
+        error: securityResult.error,
+        retryAfter: 60,
+        remaining: securityResult.remaining
+      });
+    }
+
+    // Set rate limit headers
+    res.setHeader('X-RateLimit-Limit', '100');
+    res.setHeader('X-RateLimit-Remaining', (securityResult.remaining || 0).toString());
+    res.setHeader('X-RateLimit-Reset', Math.ceil(Date.now() / 1000 + 60).toString());
+
+    // Handle OPTIONS request
     if (req.method === 'OPTIONS') return handleOptions(res);
 
     const action = ((req.query.action as string) || (req.body && (req.body as any).action)) as string | undefined;
     if (!action) return res.status(400).json({ message: 'action required' });
+
+    // Sanitize input data
+    if (req.body && typeof req.body === 'object') {
+      req.body = SecurityMiddleware.sanitizeInput(req.body);
+    }
 
     // Auth Actions
     if (req.method === 'POST' && action === 'auth-register') {
@@ -489,6 +540,77 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Advanced Search with Geospatial Filtering
+    if (req.method === 'POST' && action === 'advanced-search') {
+      try {
+        const searchQuery = req.body;
+
+        // Validate basic structure
+        if (!searchQuery || typeof searchQuery !== 'object') {
+          return res.status(400).json({
+            error: 'Invalid search query',
+            details: 'Request body must contain search query object'
+          });
+        }
+
+        // Execute advanced search
+        const results = await AdvancedSearchService.advancedSearch(searchQuery);
+
+        return res.json(results);
+      } catch (error: any) {
+        console.error('Advanced search error:', error);
+        return res.status(500).json({ error: 'Failed to perform advanced search' });
+      }
+    }
+
+    // Get Popular Searches
+    if (req.method === 'GET' && action === 'search-popular') {
+      try {
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+        const popularSearches = await AdvancedSearchService.getPopularSearches(limit);
+
+        return res.json({
+          popularSearches,
+          total: popularSearches.length
+        });
+      } catch (error: any) {
+        console.error('Get popular searches error:', error);
+        return res.status(500).json({ error: 'Failed to get popular searches' });
+      }
+    }
+
+    // Save Search
+    if (req.method === 'POST' && action === 'search-save') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const user = await AuthService.verifyToken(token);
+        const { name, query } = req.body;
+
+        if (!name || !query) {
+          return res.status(400).json({
+            error: 'Missing required fields',
+            details: 'Both name and query are required'
+          });
+        }
+
+        const savedSearch = await AdvancedSearchService.saveSearch(user.id, name, query);
+
+        return res.status(201).json({
+          message: 'Search saved successfully',
+          savedSearch
+        });
+      } catch (error: any) {
+        console.error('Save search error:', error);
+        return res.status(500).json({ error: 'Failed to save search' });
+      }
+    }
+
     // File Upload Actions
     if (req.method === 'POST' && action === 'upload') {
       try {
@@ -501,12 +623,550 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const user = await AuthService.verifyToken(token);
 
-        // Note: File upload handling would need to be adapted for Vercel's request format
-        // This is a placeholder - actual implementation would depend on how files are sent
-        return res.status(501).json({ error: 'File upload not implemented in action-based routing yet' });
+        // Handle different upload formats
+        const contentType = req.headers['content-type'];
+        let fileData: ArrayBuffer;
+        let fileName: string;
+        let mimeType: string;
+        let propertyId: string;
+
+        if (contentType?.includes('multipart/form-data')) {
+          // Multipart form data (traditional file upload)
+          return res.status(400).json({
+            error: 'Multipart uploads not supported in serverless. Use base64 or direct upload.'
+          });
+        } else if (contentType?.includes('application/json')) {
+          // JSON payload with base64 file data
+          const {
+            file: base64File,
+            filename,
+            mimeType: fileType,
+            propertyId: propId
+          } = req.body;
+
+          if (!base64File || !filename || !fileType || !propId) {
+            return res.status(400).json({
+              error: 'Missing required fields: file, filename, mimeType, propertyId'
+            });
+          }
+
+          // Validate file size (max 10MB for base64)
+          const fileSize = Buffer.byteLength(base64File, 'base64');
+          const validation = blobStorageService.validateFile({ type: fileType, size: fileSize });
+          if (!validation.valid) {
+            return res.status(400).json({ error: validation.error });
+          }
+
+          fileData = Buffer.from(base64File, 'base64');
+          fileName = filename;
+          mimeType = fileType;
+          propertyId = propId;
+        } else {
+          return res.status(400).json({
+            error: 'Invalid content type. Use application/json with base64 file data.'
+          });
+        }
+
+        // Upload file using Blob Storage service
+        const uploadResult = await blobStorageService.uploadPropertyFile(
+          propertyId,
+          fileData,
+          fileName,
+          mimeType,
+          {
+            isPrimary: req.body.isPrimary,
+            caption: req.body.caption
+          }
+        );
+
+        if (uploadResult.success && uploadResult.file) {
+          return res.status(201).json({
+            message: 'File uploaded successfully',
+            data: uploadResult.file,
+            storageInfo: blobStorageService.getStorageInfo()
+          });
+        } else {
+          return res.status(500).json({
+            error: uploadResult.error || 'Upload failed'
+          });
+        }
       } catch (error: any) {
         console.error('Upload error:', error);
         return res.status(500).json({ error: 'Upload failed' });
+      }
+    }
+
+    // Upload management actions
+    if (req.method === 'DELETE' && action === 'upload-delete') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const user = await AuthService.verifyToken(token);
+        const { fileUrl } = req.body;
+
+        if (!fileUrl) {
+          return res.status(400).json({ error: 'File URL required' });
+        }
+
+        const deleteResult = await blobStorageService.deleteFile(fileUrl);
+
+        if (deleteResult.success) {
+          return res.json({ message: 'File deleted successfully' });
+        } else {
+          return res.status(500).json({ error: deleteResult.error || 'Delete failed' });
+        }
+      } catch (error: any) {
+        console.error('Delete file error:', error);
+        return res.status(500).json({ error: 'Delete failed' });
+      }
+    }
+
+    if (req.method === 'GET' && action === 'upload-list') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const user = await AuthService.verifyToken(token);
+        const propertyId = req.query.propertyId as string;
+
+        if (!propertyId) {
+          return res.status(400).json({ error: 'Property ID required' });
+        }
+
+        const files = await blobStorageService.listPropertyFiles(propertyId);
+
+        return res.json({
+          files,
+          storageInfo: blobStorageService.getStorageInfo()
+        });
+      } catch (error: any) {
+        console.error('List files error:', error);
+        return res.status(500).json({ error: 'Failed to list files' });
+      }
+    }
+
+    // Property Comparison Actions
+    if (req.method === 'POST' && action === 'comparison-create') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const user = await AuthService.verifyToken(token);
+        const { name, propertyIds, isPublic, notes } = req.body;
+
+        if (!name || !propertyIds || !Array.isArray(propertyIds) || propertyIds.length < 2) {
+          return res.status(400).json({
+            error: 'Invalid input',
+            details: 'Name and at least 2 property IDs are required'
+          });
+        }
+
+        const comparison = await PropertyComparisonService.createComparison(
+          user.id,
+          name,
+          propertyIds,
+          { isPublic, notes }
+        );
+
+        return res.status(201).json({
+          message: 'Comparison created successfully',
+          comparison
+        });
+      } catch (error: any) {
+        console.error('Create comparison error:', error);
+        return res.status(500).json({ error: error.message || 'Failed to create comparison' });
+      }
+    }
+
+    if (req.method === 'GET' && action === 'comparison-detail') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+        const comparisonId = req.query.id as string;
+        const shareToken = req.query.shareToken as string;
+
+        if (!comparisonId) {
+          return res.status(400).json({ error: 'Comparison ID required' });
+        }
+
+        let userId: string | undefined;
+        if (token) {
+          const user = await AuthService.verifyToken(token);
+          userId = user.id;
+        }
+
+        const accessValidation = await PropertyComparisonService.validateAccess(
+          comparisonId,
+          userId,
+          shareToken
+        );
+
+        if (!accessValidation.allowed) {
+          return res.status(403).json({ error: 'Access denied', reason: accessValidation.reason });
+        }
+
+        const comparison = await PropertyComparisonService.getComparison(comparisonId, userId);
+        if (!comparison) {
+          return res.status(404).json({ error: 'Comparison not found' });
+        }
+
+        // Generate metrics and charts
+        const metrics = PropertyComparisonService.generateComparisonMetrics(comparison.properties);
+        const charts = PropertyComparisonService.generateComparisonCharts(comparison.properties, metrics);
+        const recommendations = PropertyComparisonService.generateRecommendations(comparison.properties, metrics);
+
+        return res.json({
+          comparison,
+          metrics,
+          charts,
+          recommendations
+        });
+      } catch (error: any) {
+        console.error('Get comparison error:', error);
+        return res.status(500).json({ error: 'Failed to get comparison' });
+      }
+    }
+
+    if (req.method === 'GET' && action === 'comparison-list') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const user = await AuthService.verifyToken(token);
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+        const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+        const includePublic = req.query.includePublic === 'true';
+
+        const comparisons = await PropertyComparisonService.getUserComparisons(user.id, {
+          limit,
+          offset,
+          includePublic
+        });
+
+        return res.json({
+          comparisons,
+          total: comparisons.length,
+          limit,
+          offset
+        });
+      } catch (error: any) {
+        console.error('List comparisons error:', error);
+        return res.status(500).json({ error: 'Failed to list comparisons' });
+      }
+    }
+
+    if (req.method === 'POST' && action === 'comparison-export') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const user = await AuthService.verifyToken(token);
+        const { comparisonId, format } = req.body;
+
+        if (!comparisonId) {
+          return res.status(400).json({ error: 'Comparison ID required' });
+        }
+
+        const comparison = await PropertyComparisonService.getComparison(comparisonId, user.id);
+        if (!comparison) {
+          return res.status(404).json({ error: 'Comparison not found' });
+        }
+
+        const metrics = PropertyComparisonService.generateComparisonMetrics(comparison.properties);
+        const charts = PropertyComparisonService.generateComparisonCharts(comparison.properties, metrics);
+        const recommendations = PropertyComparisonService.generateRecommendations(comparison.properties, metrics);
+
+        const exportData = PropertyComparisonService.exportToPDF(
+          comparison,
+          metrics,
+          charts,
+          recommendations
+        );
+
+        return res.json({
+          message: 'Comparison exported successfully',
+          data: exportData,
+          format: format || 'json'
+        });
+      } catch (error: any) {
+        console.error('Export comparison error:', error);
+        return res.status(500).json({ error: 'Failed to export comparison' });
+      }
+    }
+
+    if (req.method === 'DELETE' && action === 'comparison-delete') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const user = await AuthService.verifyToken(token);
+        const { comparisonId } = req.body;
+
+        if (!comparisonId) {
+          return res.status(400).json({ error: 'Comparison ID required' });
+        }
+
+        await PropertyComparisonService.deleteComparison(comparisonId, user.id);
+
+        return res.json({ message: 'Comparison deleted successfully' });
+      } catch (error: any) {
+        console.error('Delete comparison error:', error);
+        return res.status(500).json({ error: 'Failed to delete comparison' });
+      }
+    }
+
+    // Historical Price Tracking Actions
+    if (req.method === 'POST' && action === 'price-scrape') {
+      try {
+        const { province, district, propertyType, sources, maxPages } = req.body;
+
+        if (!province) {
+          return res.status(400).json({
+            error: 'Province required',
+            details: 'Please provide a province for price scraping'
+          });
+        }
+
+        const defaultSources = sources || ['batdongsan', 'chotot'];
+        const results: any = { totalScraped: 0, sources: {} };
+
+        // Scrape from each source
+        for (const source of defaultSources) {
+          try {
+            let pricePoints = [];
+
+            switch (source) {
+              case 'batdongsan':
+                pricePoints = await HistoricalPriceService.scrapeBatdongsan(
+                  province,
+                  district,
+                  propertyType,
+                  maxPages || 3
+                );
+                break;
+              case 'chotot':
+                pricePoints = await HistoricalPriceService.scrapeChotot(
+                  province,
+                  district,
+                  propertyType,
+                  maxPages || 3
+                );
+                break;
+              case 'meeymap':
+                pricePoints = await HistoricalPriceService.scrapeMeeyMap(
+                  province,
+                  district,
+                  propertyType
+                );
+                break;
+            }
+
+            // Store the scraped data
+            await HistoricalPriceService.storePricePoints(pricePoints);
+
+            results.sources[source] = {
+              scraped: pricePoints.length,
+              avgPrice: pricePoints.length > 0
+                ? Math.round(pricePoints.reduce((sum, p) => sum + p.price, 0) / pricePoints.length)
+                : 0,
+              avgPricePerSqm: pricePoints.length > 0
+                ? Math.round(pricePoints.reduce((sum, p) => sum + p.pricePerSqm, 0) / pricePoints.length)
+                : 0
+            };
+
+            results.totalScraped += pricePoints.length;
+
+          } catch (error: any) {
+            results.sources[source] = {
+              error: error.message,
+              scraped: 0
+            };
+          }
+        }
+
+        return res.json({
+          message: 'Price scraping completed',
+          province,
+          district,
+          propertyType,
+          results,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error: any) {
+        console.error('Price scrape error:', error);
+        return res.status(500).json({ error: 'Failed to scrape price data' });
+      }
+    }
+
+    if (req.method === 'GET' && action === 'price-trends') {
+      try {
+        const province = req.query.province as string;
+        const district = req.query.district as string;
+        const propertyType = req.query.propertyType as string;
+        const period = (req.query.period as string) || '3months';
+
+        if (!province) {
+          return res.status(400).json({
+            error: 'Province required',
+            details: 'Please provide a province for price trends'
+          });
+        }
+
+        const trends = await HistoricalPriceService.getPriceTrends(
+          province,
+          district,
+          propertyType,
+          period as any
+        );
+
+        if (!trends) {
+          return res.status(404).json({ error: 'Price trends not found for this location' });
+        }
+
+        return res.json({
+          trends,
+          location: `${province}${district ? ', ' + district : ''}`,
+          propertyType: propertyType || 'all',
+          period
+        });
+      } catch (error: any) {
+        console.error('Get price trends error:', error);
+        return res.status(500).json({ error: 'Failed to get price trends' });
+      }
+    }
+
+    if (req.method === 'POST' && action === 'price-alert-create') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const user = await AuthService.verifyToken(token);
+        const alertData = req.body;
+
+        const alert = await HistoricalPriceService.createPriceAlert({
+          ...alertData,
+          userId: user.id,
+          isActive: true
+        });
+
+        return res.status(201).json({
+          message: 'Price alert created successfully',
+          alert
+        });
+      } catch (error: any) {
+        console.error('Create price alert error:', error);
+        return res.status(500).json({ error: 'Failed to create price alert' });
+      }
+    }
+
+    if (req.method === 'GET' && action === 'price-alerts') {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const user = await AuthService.verifyToken(token);
+
+        // TODO: Implement get user alerts
+        const alerts = await HistoricalPriceService.checkPriceAlerts();
+
+        return res.json({
+          alerts,
+          total: alerts.length
+        });
+      } catch (error: any) {
+        console.error('Get price alerts error:', error);
+        return res.status(500).json({ error: 'Failed to get price alerts' });
+      }
+    }
+
+    if (req.method === 'POST' && action === 'price-analysis') {
+      try {
+        const { coordinates, radius, propertyType } = req.body;
+
+        if (!coordinates || !Array.isArray(coordinates) || coordinates.length < 2) {
+          return res.status(400).json({
+            error: 'Coordinates required',
+            details: 'Please provide valid coordinates [lat, lng]'
+          });
+        }
+
+        const analysisRadius = radius || 2000; // 2km default
+        const [lat, lng] = coordinates;
+
+        // Extract province/district from coordinates (simplified)
+        // In a real implementation, you'd use reverse geocoding
+        const province = 'hà nội'; // Default for demo
+        const district = 'cầu giấy'; // Default for demo
+
+        // Get comprehensive price analysis
+        const trends = await HistoricalPriceService.getPriceTrends(
+          province,
+          district,
+          propertyType,
+          '6months'
+        );
+
+        // Additional analysis specific to the location
+        const locationAnalysis = {
+          coordinates: { lat, lng },
+          radius: analysisRadius,
+          currentMarketStatus: trends ? {
+            avgPrice: trends.currentAvgPrice,
+            avgPricePerSqm: trends.currentAvgPricePerSqm,
+            trendDirection: trends.trends['6months'].trendDirection,
+            confidence: trends.trends['6months'].confidence
+          } : null,
+          recommendations: trends ? [
+            trends.trends['6months'].trendDirection === 'up'
+              ? 'Giá đang tăng,可以考虑 đầu tư'
+              : 'Giá đang ổn định, có thể đợi cơ hội tốt hơn',
+            `Giá trung bình: ${formatCurrency(trends.currentAvgPrice)}`,
+            `Diện tích trung bình: ${Math.round(trends.currentAvgPrice / trends.currentAvgPricePerSqm)} m²`
+          ] : [],
+          marketHeat: trends ? calculateMarketHeat(trends) : 'unknown'
+        };
+
+        return res.json({
+          locationAnalysis,
+          priceTrends: trends,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error: any) {
+        console.error('Price analysis error:', error);
+        return res.status(500).json({ error: 'Failed to analyze prices' });
       }
     }
 
