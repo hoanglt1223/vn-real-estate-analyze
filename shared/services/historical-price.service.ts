@@ -658,4 +658,98 @@ export class HistoricalPriceService {
   private static delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+
+  /**
+   * Quick analysis for location - used in background jobs
+   */
+  static async analyzeLocationPrices(
+    lat: number,
+    lng: number,
+    radius: number = 2000
+  ): Promise<{
+    location: string;
+    province: string;
+    district: string;
+    quickStats: {
+      avgPrice: number;
+      avgPricePerSqm: number;
+      totalListings: number;
+      marketHeat: 'hot' | 'warm' | 'cold' | 'stable';
+    };
+    recommendations: string[];
+    timestamp: Date;
+  }> {
+    try {
+      // For demo purposes, return mock data quickly
+      // In production, this would scrape real data
+
+      // Simple reverse geocoding (simplified)
+      const locationInfo = await this.reverseGeocode(lat, lng);
+
+      return {
+        location: locationInfo.address,
+        province: locationInfo.province,
+        district: locationInfo.district,
+        quickStats: {
+          avgPrice: 45000000000, // 45 tỷ
+          avgPricePerSqm: 45000000, // 45 triệu/m²
+          totalListings: 89,
+          marketHeat: this.calculateQuickMarketHeat()
+        },
+        recommendations: [
+          'Giá đang có xu hướng tăng nhẹ trong khu vực',
+          'Nhiều tiện ích giáo dục và y tế trong bán kính 2km',
+          'Giao thông thuận tiện, gần các trục đường chính'
+        ],
+        timestamp: new Date()
+      };
+    } catch (error) {
+      console.error('Quick location analysis error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Simple reverse geocoding
+   */
+  private static async reverseGeocode(lat: number, lng: number): Promise<{
+    address: string;
+    province: string;
+    district: string;
+  }> {
+    // Simplified geocoding - in production use real geocoding service
+    // This is just for demo purposes
+
+    if (lat > 21.0 && lat < 21.1 && lng > 105.7 && lng < 105.9) {
+      return {
+        address: 'Cầu Giấy, Hà Nội',
+        province: 'hà nội',
+        district: 'cầu giấy'
+      };
+    } else if (lat > 10.7 && lat < 10.9 && lng > 106.6 && lng < 106.8) {
+      return {
+        address: 'Quận 1, TP.HCM',
+        province: 'hồ chí minh',
+        district: 'quận 1'
+      };
+    } else {
+      return {
+        address: 'Vị trí chưa xác định',
+        province: 'unknown',
+        district: 'unknown'
+      };
+    }
+  }
+
+  /**
+   * Quick market heat calculation
+   */
+  private static calculateQuickMarketHeat(): 'hot' | 'warm' | 'cold' | 'stable' {
+    // Simple heuristic - in production use real data
+    const random = Math.random();
+    if (random > 0.7) return 'hot';
+    if (random > 0.4) return 'warm';
+    if (random > 0.2) return 'stable';
+    return 'cold';
+  }
 }

@@ -1702,7 +1702,12 @@ POST /api?action=price-alert-create
 GET /api?action=price-alerts
 POST /api?action=price-analysis
 
-// TOTAL: 35+ API Actions
+// Quick Flow & Export (3 actions)
+GET /api?action=analysis-status
+POST /api?action=export-md
+POST /api?action=export-pdf
+
+// TOTAL: 38+ API Actions
 ```
 
 ### 8.3 📋 FINAL DIRECTORY STRUCTURE

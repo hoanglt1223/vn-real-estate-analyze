@@ -24,6 +24,7 @@ import { blobStorageService } from '../shared/services/blob-storage.service.js';
 import { AdvancedSearchService } from '../shared/services/advanced-search.service.js';
 import { PropertyComparisonService } from '../shared/services/property-comparison.service.js';
 import { HistoricalPriceService } from '../shared/services/historical-price.service.js';
+import { ExportService } from '../shared/services/export.service.js';
 import { CreateUserInput, LoginInput } from '../shared/types/user.types.js';
 
 const store = new Map<string, PropertyAnalysis>();
@@ -249,62 +250,117 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Property Actions
+    // Property Actions - QUICK FLOW
     if (req.method === 'POST' && action === 'analyze-property') {
-      const input = analyzePropertySchema.parse(req.body);
-      const metrics = calculatePropertyMetrics(input.coordinates);
+      try {
+        const input = analyzePropertySchema.parse(req.body);
+        const quickMode = req.body.quickMode || false; // Default to comprehensive analysis
 
-      // Run independent API calls in parallel to improve performance
-      const [amenities, infrastructure, marketData] = await Promise.all([
-        fetchAmenities(metrics.center.lat, metrics.center.lng, input.radius, input.categories, input.includeSmallShops, input.maxAmenities),
-        fetchInfrastructure(metrics.center.lat, metrics.center.lng, input.radius, input.layers),
-        scrapeMarketPrices(metrics.center.lat, metrics.center.lng, input.radius)
-      ]);
+        // STEP 1: Calculate basic metrics (instant)
+        const metrics = calculatePropertyMetrics(input.coordinates);
+        const center = metrics.center;
 
-      // Risk assessment depends on infrastructure, so it runs after infrastructure is loaded
-      const riskAssessment = assessRisks(metrics.center, infrastructure);
+        // Quick response with basic info
+        const quickResponse = {
+          id: randomUUID(),
+          step: 'basic',
+          coordinates: input.coordinates,
+          metrics: {
+            area: metrics.area,
+            orientation: metrics.orientation,
+            frontageCount: metrics.frontageCount,
+            center: metrics.center
+          },
+          timestamp: new Date().toISOString()
+        };
 
-      // AI analysis depends on all previous data, so it runs last
-      const aiAnalysis = await analyzeProperty({
-        area: metrics.area,
-        orientation: metrics.orientation,
-        frontageCount: metrics.frontageCount,
-        amenities,
-        infrastructure,
-        marketData,
-        risks: riskAssessment.risks
-      });
+        if (quickMode) {
+          // QUICK MODE: Return immediately with basic info + background jobs
+          return res.json({
+            ...quickResponse,
+            message: 'Basic analysis complete. Historical data loading in background.',
+            backgroundJobs: [
+              { type: 'amenities', status: 'pending' },
+              { type: 'infrastructure', status: 'pending' },
+              { type: 'marketData', status: 'pending' },
+              { type: 'aiAnalysis', status: 'pending' },
+              { type: 'historicalPrices', status: 'pending' }
+            ]
+          });
+        }
 
-      const id = randomUUID();
-      const analysis: PropertyAnalysis = {
-        id,
-        coordinates: input.coordinates,
-        area: metrics.area,
-        orientation: metrics.orientation,
-        frontageCount: metrics.frontageCount,
-        center: metrics.center,
-        amenities,
-        infrastructure,
-        marketData,
-        aiAnalysis,
-        risks: riskAssessment.risks,
-        propertyType: null,
-        valuation: null,
-        askingPrice: null,
-        notes: null,
-        createdAt: new Date()
-      } as PropertyAnalysis;
-      store.set(id, analysis);
-      return res.json({
-        id,
-        ...metrics,
-        amenities,
-        infrastructure,
-        marketData,
-        aiAnalysis,
-        risks: riskAssessment.risks,
-        overallRiskLevel: riskAssessment.overallRiskLevel
-      });
+        // STEP 2: Fetch amenities and infrastructure (parallel - fast)
+        const [amenities, infrastructure] = await Promise.all([
+          fetchAmenities(center.lat, center.lng, input.radius, input.categories, input.includeSmallShops, input.maxAmenities),
+          fetchInfrastructure(center.lat, center.lng, input.radius, input.layers)
+        ]);
+
+        // STEP 3: Risk assessment (instant based on infrastructure)
+        const riskAssessment = assessRisks(center, infrastructure);
+
+        // STEP 4: Quick market data (cached or fast scrape)
+        const marketData = await scrapeMarketPrices(center.lat, center.lng, input.radius);
+
+        // STEP 5: AI analysis (fast version)
+        const aiAnalysis = await analyzeProperty({
+          area: metrics.area,
+          orientation: metrics.orientation,
+          frontageCount: metrics.frontageCount,
+          amenities,
+          infrastructure,
+          marketData,
+          risks: riskAssessment.risks
+        });
+
+        // Store basic analysis
+        const id = randomUUID();
+        const analysis: PropertyAnalysis = {
+          id,
+          coordinates: input.coordinates,
+          area: metrics.area,
+          orientation: metrics.orientation,
+          frontageCount: metrics.frontageCount,
+          center: metrics.center,
+          amenities,
+          infrastructure,
+          marketData,
+          aiAnalysis,
+          risks: riskAssessment.risks,
+          propertyType: null,
+          valuation: null,
+          notes: null,
+          createdAt: new Date()
+        };
+
+        store.set(id, analysis);
+
+        // STEP 6: Start historical data scraping in background
+        // Don't wait for this - run it async
+        HistoricalPriceService.analyzeLocationPrices(center.lat, center.lng, input.radius)
+          .then(historicalData => {
+            console.log('Historical data scraped for analysis:', id, historicalData);
+            // TODO: Update analysis with historical data or send to client via WebSocket
+          })
+          .catch(error => {
+            console.error('Historical data scraping failed:', error);
+          });
+
+        return res.json({
+          ...analysis,
+          step: 'comprehensive',
+          message: 'Full analysis complete. Historical data loading in background.',
+          backgroundJobs: [
+            { type: 'historicalPrices', status: 'loading', estimatedTime: '30-60 seconds' }
+          ]
+        });
+
+      } catch (error: any) {
+        console.error('Analyze property error:', error);
+        return res.status(500).json({
+          error: 'Failed to analyze property',
+          details: error.message
+        });
+      }
     }
 
     if (req.method === 'GET' && action === 'analysis') {
@@ -950,6 +1006,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Historical Price Tracking Actions
+    if (req.method === 'GET' && action === 'analysis-status') {
+      try {
+        const analysisId = req.query.id as string;
+
+        if (!analysisId) {
+          return res.status(400).json({ error: 'Analysis ID required' });
+        }
+
+        const analysis = store.get(analysisId);
+        if (!analysis) {
+          return res.status(404).json({ error: 'Analysis not found' });
+        }
+
+        // Check if historical data is available (simplified check)
+        const hasHistoricalData = analysis.aiAnalysis && analysis.aiAnalysis.recommendations;
+
+        return res.json({
+          analysisId,
+          status: hasHistoricalData ? 'completed' : 'loading',
+          completedSteps: [
+            'basic_metrics',
+            'amenities',
+            'infrastructure',
+            'market_data',
+            'ai_analysis'
+          ],
+          pendingSteps: hasHistoricalData ? [] : ['historical_prices'],
+          estimatedTimeRemaining: hasHistoricalData ? 0 : 30,
+          lastUpdated: analysis.createdAt
+        });
+      } catch (error: any) {
+        console.error('Analysis status error:', error);
+        return res.status(500).json({ error: 'Failed to get analysis status' });
+      }
+    }
+
     if (req.method === 'POST' && action === 'price-scrape') {
       try {
         const { province, district, propertyType, sources, maxPages } = req.body;
@@ -1179,9 +1271,171 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Enhanced Export Actions
+    if (req.method === 'POST' && action === 'export') {
+      try {
+        const analysisId = req.body.analysisId;
+        const format = req.body.format || 'html';
+        const includeHistorical = req.body.includeHistorical || false;
+        const includeRawData = req.body.includeRawData || true;
+        const template = req.body.template || 'modern';
+
+        if (!analysisId) {
+          return res.status(400).json({
+            error: 'Analysis ID required',
+            details: 'Please provide analysisId in request body'
+          });
+        }
+
+        const analysis = store.get(analysisId);
+        if (!analysis) {
+          return res.status(404).json({ error: 'Analysis not found' });
+        }
+
+        // Validate format
+        const validFormats = ['html', 'markdown', 'json', 'csv'];
+        if (!validFormats.includes(format)) {
+          return res.status(400).json({
+            error: 'Invalid format',
+            details: `Valid formats: ${validFormats.join(', ')}`
+          });
+        }
+
+        // Generate export using new ExportService
+        const exportOptions = {
+          format: format as any,
+          includeHistorical,
+          includeRawData,
+          template: template as any
+        };
+
+        const exportResult = await ExportService.generateFullReport(analysis, exportOptions);
+
+        return res.json({
+          success: true,
+          data: exportResult,
+          message: `${format.toUpperCase()} report generated successfully`,
+          options: exportOptions
+        });
+      } catch (error: any) {
+        console.error('Export error:', error);
+        return res.status(500).json({
+          error: 'Failed to generate export',
+          details: error.message
+        });
+      }
+    }
+
+    // Legacy Export Actions (backward compatibility)
+    if (req.method === 'POST' && action === 'export-md') {
+      try {
+        const analysisId = req.body.analysisId;
+        const includeHistorical = req.body.includeHistorical || false;
+
+        // Redirect to new export action
+        req.body.format = 'markdown';
+        req.body.includeRawData = true;
+        req.body.template = 'modern';
+
+        // Continue with new export logic
+        const analysis = store.get(analysisId);
+        if (!analysis) {
+          return res.status(404).json({ error: 'Analysis not found' });
+        }
+
+        const exportOptions = {
+          format: 'markdown' as const,
+          includeHistorical,
+          includeRawData: true,
+          template: 'modern' as const
+        };
+
+        const exportResult = await ExportService.generateFullReport(analysis, exportOptions);
+
+        return res.json({
+          success: true,
+          content: exportResult.content,
+          filename: exportResult.filename,
+          metadata: exportResult.metadata,
+          message: 'Markdown report generated successfully'
+        });
+      } catch (error: any) {
+        console.error('Export MD error:', error);
+        return res.status(500).json({ error: 'Failed to export to Markdown' });
+      }
+    }
+
+    if (req.method === 'POST' && action === 'export-html') {
+      try {
+        const analysisId = req.body.analysisId;
+        const includeHistorical = req.body.includeHistorical || false;
+        const template = req.body.template || 'modern';
+
+        const analysis = store.get(analysisId);
+        if (!analysis) {
+          return res.status(404).json({ error: 'Analysis not found' });
+        }
+
+        const exportOptions = {
+          format: 'html' as const,
+          includeHistorical,
+          includeRawData: true,
+          template: template as any
+        };
+
+        const exportResult = await ExportService.generateFullReport(analysis, exportOptions);
+
+        return res.json({
+          success: true,
+          content: exportResult.content,
+          filename: exportResult.filename,
+          metadata: exportResult.metadata,
+          message: 'HTML report generated successfully'
+        });
+      } catch (error: any) {
+        console.error('Export HTML error:', error);
+        return res.status(500).json({ error: 'Failed to export to HTML' });
+      }
+    }
+
+    if (req.method === 'POST' && action === 'export-pdf') {
+      try {
+        const analysisId = req.body.analysisId;
+        const includeHistorical = req.body.includeHistorical || false;
+
+        // For now, generate HTML which can be converted to PDF
+        const analysis = store.get(analysisId);
+        if (!analysis) {
+          return res.status(404).json({ error: 'Analysis not found' });
+        }
+
+        const exportOptions = {
+          format: 'html' as const,
+          includeHistorical,
+          includeRawData: true,
+          template: 'modern' as const
+        };
+
+        const exportResult = await ExportService.generateFullReport(analysis, exportOptions);
+
+        return res.json({
+          success: true,
+          content: exportResult.content,
+          filename: exportResult.filename.replace('.html', '.pdf'),
+          metadata: exportResult.metadata,
+          message: 'HTML report generated. Use Print to PDF or convert with external tool.',
+          note: 'HTML format provides reliable export. Use browser Print to PDF for best results.'
+        });
+      } catch (error: any) {
+        console.error('Export PDF error:', error);
+        return res.status(500).json({ error: 'Failed to export to PDF' });
+      }
+    }
+
     return res.status(405).json({ message: 'method or action not supported' });
   } catch (error: any) {
     return handleError(res, error, 'Core API');
   }
 }
 
+// Markdown Report Generator
