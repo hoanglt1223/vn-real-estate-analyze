@@ -51,13 +51,10 @@ export default function ManagementPage() {
     queryKey: [API_ENDPOINTS.propertiesList]
   });
 
-  const displayProperties = getArray(searchResults || properties);
-
-  // Debug: Log the original data
-  console.log('Original properties data:', properties);
-  console.log('Search results data:', searchResults);
-  console.log('Display properties count:', displayProperties.length);
-  console.log('Display properties sample:', displayProperties.slice(0, 2));
+  // Fix: Handle searchResults correctly - it has a 'properties' key
+const displayProperties = isSearchMode
+  ? getArray(searchResults?.properties)
+  : getArray(properties);
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<PropertyAnalysis> }) => {
