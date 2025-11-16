@@ -464,9 +464,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         const { query, filters: searchFilters = {} } = req.body;
 
-        if (!query) {
-          return res.status(400).json({ error: 'Search query required' });
-        }
+        // Query is optional - allow empty query to search with filters only
 
         const filters = {
           propertyType: searchFilters.propertyType || undefined,
