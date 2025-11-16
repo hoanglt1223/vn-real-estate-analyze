@@ -1,5 +1,5 @@
-import { cache, generateCacheKey, CACHE_TTL } from '../../shared/services/cache';
-import { processMarketData } from '../../shared/services/dataProcessor';
+import { cache, generateCacheKey, CACHE_TTL } from './cache';
+import { processMarketData } from './dataProcessor';
 
 export interface PriceListing {
   id: string;
@@ -58,14 +58,14 @@ export async function scrapeMarketPrices(
     console.log(`Starting market price scraping for lat: ${lat}, lng: ${lng}, radius: ${radius}m`);
 
     // Generate cache key based on location and radius
-    const cacheKey = generateCacheKey('marketPrices', {
-      lat: lat.toFixed(4),
-      lng: lng.toFixed(4),
+    const cacheKey = generateCacheKey('marketPrices',
+      lat.toFixed(4),
+      lng.toFixed(4),
       radius
-    });
+    );
 
     // Try to get from cache first
-    const cachedResult = cache.get(cacheKey);
+    const cachedResult = await cache.get(cacheKey);
     if (cachedResult) {
       console.log(`Cache hit for market prices: ${cacheKey}`);
       // Update lastUpdated to current time to keep data fresh

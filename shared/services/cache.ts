@@ -1,111 +1,86 @@
-// Shared cache service - can be used by both client and server
-export interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  ttl: number;
-}
+import { kv } from '@vercel/kv';
 
-class MemoryCache {
-  private cache: Map<string, CacheEntry<any>> = new Map();
-  private defaultTTL: number = 5 * 60 * 1000; // 5 minutes default
-
-  set<T>(key: string, data: T, ttl?: number): void {
-    const entry: CacheEntry<T> = {
-      data,
-      timestamp: Date.now(),
-      ttl: ttl || this.defaultTTL
-    };
-    this.cache.set(key, entry);
-  }
-
-  get<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) {
-      return null;
-    }
-
-    // Check if entry has expired
-    if (Date.now() - entry.timestamp > entry.ttl) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    return entry.data;
-  }
-
-  delete(key: string): boolean {
-    return this.cache.delete(key);
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-
-  // Cleanup expired entries
-  cleanup(): void {
-    const now = Date.now();
-    for (const [key, entry] of Array.from(this.cache.entries())) {
-      if (now - entry.timestamp > entry.ttl) {
-        this.cache.delete(key);
-      }
-    }
-  }
-
-  // Get cache statistics
-  size(): number {
-    return this.cache.size;
-  }
-
-  // Check if key exists and is not expired
-  has(key: string): boolean {
-    const entry = this.cache.get(key);
-    if (!entry) {
-      return false;
-    }
-
-    if (Date.now() - entry.timestamp > entry.ttl) {
-      this.cache.delete(key);
-      return false;
-    }
-
-    return true;
-  }
-
-  // Get all keys (useful for debugging)
-  keys(): string[] {
-    return Array.from(this.cache.keys());
-  }
-}
-
-// Create a singleton instance
-export const cache = new MemoryCache();
-
-// Cleanup expired entries every 10 minutes
-if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    cache.cleanup();
-  }, 10 * 60 * 1000);
-}
-
-// Generate cache keys for different data types
-export function generateCacheKey(
-  type: 'amenities' | 'infrastructure' | 'marketPrices' | 'geocoding' | 'locationSuggestions',
-  params: Record<string, any>
-): string {
-  const sortedParams = Object.keys(params)
-    .sort()
-    .map(key => `${key}:${params[key]}`)
-    .join('|');
-  return `${type}:${sortedParams}`;
-}
-
-// Cache TTL constants (in milliseconds)
+// Cache TTL in seconds
 export const CACHE_TTL = {
-  AMENITIES: 10 * 60 * 1000, // 10 minutes
-  INFRASTRUCTURE: 30 * 60 * 1000, // 30 minutes
-  MARKET_PRICES: 60 * 60 * 1000, // 1 hour
-  GEOCODING: 24 * 60 * 60 * 1000, // 24 hours
-  LOCATION_SUGGESTIONS: 24 * 60 * 60 * 1000, // 24 hours
-} as const;
+  SHORT: 300,      // 5 minutes
+  MEDIUM: 1800,   // 30 minutes
+  LONG: 7200,     // 2 hours
+  DAY: 86400,     // 24 hours
+  GEOCODING: 86400, // 24 hours for geocoding
+  MARKET_PRICES: 3600, // 1 hour for market prices
+};
 
-export default cache;
+// Cache service for Vercel KV
+export const cache = {
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      const value = await kv.get(key);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      console.error('Cache get error:', error);
+      return null;
+    }
+  },
+
+  async set(key: string, value: any, ttl: number = CACHE_TTL.MEDIUM): Promise<void> {
+    try {
+      await kv.set(key, JSON.stringify(value), { ex: ttl });
+    } catch (error) {
+      console.error('Cache set error:', error);
+    }
+  },
+
+  async del(key: string): Promise<void> {
+    try {
+      await kv.del(key);
+    } catch (error) {
+      console.error('Cache delete error:', error);
+    }
+  },
+
+  async exists(key: string): Promise<boolean> {
+    try {
+      const exists = await kv.exists(key);
+      return exists === 1;
+    } catch (error) {
+      console.error('Cache exists error:', error);
+      return false;
+    }
+  },
+
+  async has(key: string): Promise<boolean> {
+    return this.exists(key);
+  }
+};
+
+// Generate cache key
+export function generateCacheKey(prefix: string, ...params: (string | number)[]): string {
+  return `${prefix}:${params.join(':')}`;
+}
+
+// Decorator for caching function results
+export function cached(ttl: number = CACHE_TTL.MEDIUM) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+
+    descriptor.value = async function (...args: any[]) {
+      const cacheKey = generateCacheKey(propertyKey, ...args);
+
+      // Try to get from cache
+      const cached = await cache.get(cacheKey);
+      if (cached !== null) {
+        return cached;
+      }
+
+      // Execute original method
+      const result = await originalMethod.apply(this, args);
+
+      // Store in cache
+      await cache.set(cacheKey, result, ttl);
+
+      return result;
+    };
+
+    return descriptor;
+  };
+}

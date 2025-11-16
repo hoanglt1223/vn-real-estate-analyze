@@ -1,5 +1,26 @@
-// Shared geocoding utilities
 import { cache, generateCacheKey, CACHE_TTL } from './cache';
+import { httpClient, MapboxClient } from './httpClient';
+
+// Helper functions
+async function fetchWithCache<T>(key: string, params: any, fetcher: () => Promise<T>): Promise<T> {
+  const cacheKey = generateCacheKey(key, params);
+  const cached = await cache.get<T>(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
+
+  const result = await fetcher();
+  await cache.set(cacheKey, result, CACHE_TTL.LONG);
+  return result;
+}
+
+function generateGeocodingKey(query: string): string {
+  return generateCacheKey('geocoding', query.toLowerCase().trim());
+}
+
+function generateLocationSuggestionsKey(query: string, options: any): string {
+  return generateCacheKey('suggestions', query.toLowerCase().trim(), JSON.stringify(options));
+}
 
 export interface GeocodingResult {
   coordinates: [number, number]; // [lng, lat]
@@ -7,144 +28,189 @@ export interface GeocodingResult {
   placeType: string;
   context?: string;
 }
+// Create Mapbox client instance
+let mapboxClient: MapboxClient | null = null;
+
+function getMapboxClient(): MapboxClient {
+  if (!mapboxClient) {
+    const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+    if (!token) {
+      throw new Error('MAPBOX_TOKEN or VITE_MAPBOX_TOKEN is required for geocoding');
+    }
+    mapboxClient = new MapboxClient(token);
+  }
+  return mapboxClient;
+}
+
+export async function geocodeLocation(query: string): Promise<GeocodingResult | null> {
+  const client = getMapboxClient();
+
+  return fetchWithCache('geocoding', { query: query.toLowerCase().trim() }, async () => {
+    try {
+      const response = await client.geocode(query, {
+        country: 'VN',
+        language: 'vi',
+        limit: 1
+      });
+
+      const data = response.data;
+      if (!data.features || data.features.length === 0) {
+        return null;
+      }
+
+      const feature = data.features[0];
+      const [lng, lat] = feature.geometry.coordinates;
+
+      return {
+        coordinates: [lng, lat],
+        placeName: feature.place_name || query,
+        placeType: Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : 'location',
+        context: feature.text || undefined
+      };
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      return null;
+    }
+  });
+}
 
 export interface LocationSuggestion {
   name: string;
   fullName: string;
-  type: 'address' | 'place' | 'poi' | 'locality' | 'neighborhood';
+  type: 'province' | 'district' | 'ward' | 'address' | 'place' | 'poi' | 'locality' | 'neighborhood' | 'region' | 'postcode' | 'country';
+  province?: string;
+  district?: string;
   code: number;
   geocodeQuery: string;
   mapboxId?: string;
 }
 
-// Generic function to make geocoding API calls with caching
-export async function fetchWithCache<T>(
-  cacheType: 'geocoding' | 'locationSuggestions',
-  keyParams: Record<string, any>,
-  fetcher: () => Promise<T>,
-  ttl?: number
-): Promise<T> {
-  const cacheKey = generateCacheKey(cacheType, keyParams);
+export async function suggestLocations(query: string, options?: { limit?: number; sessionToken?: string; types?: string; proximity?: string; country?: string; language?: string }): Promise<LocationSuggestion[]> {
+  // Generate cache key for location suggestions (excluding sessionToken)
+  const cacheKey = generateCacheKey('locationSuggestions',
+    query.toLowerCase().trim(),
+    options?.limit ?? 10,
+    options?.types ?? 'address,place,poi,locality,neighborhood,region,postcode,district,country',
+    options?.proximity || '',
+    options?.country ?? 'VN',
+    options?.language ?? 'vi'
+  );
 
-  // Try to get from cache first
-  const cachedResult = cache.get(cacheKey);
-  if (cachedResult !== null) {
-    console.log(`Cache hit for ${cacheType}:`, keyParams);
-    return cachedResult as T;
-  }
+  // CACHE DISABLED FOR TESTING - Always fetch fresh results
+  console.log(`Cache disabled - fetching fresh results for: ${query}`);
 
-  console.log(`Cache miss for ${cacheType}:`, keyParams);
+  const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+  if (!token) return [];
+  const limit = options?.limit ?? 10;
+  const sessionToken = options?.sessionToken ?? undefined;
+  const types = options?.types ?? 'address,place,poi,locality,neighborhood,region,postcode,district,country';
+  const proximity = options?.proximity ? `&proximity=${options?.proximity}` : '';
+  const country = options?.country ?? 'VN';
+  const language = options?.language ?? 'vi';
 
-  // Fetch new data
-  const result = await fetcher();
+  console.log(`Cache miss for location suggestions: ${query}`);
 
-  // Cache the result (including null results to avoid repeated failed requests)
-  cache.set(cacheKey, result, ttl || CACHE_TTL.GEOCODING);
+  const base = 'https://api.mapbox.com/search/searchbox/v1/suggest';
+  const url = `${base}?q=${encodeURIComponent(query)}&access_token=${token}&limit=${limit}&country=${country}&language=${language}&types=${types}${proximity}${sessionToken ? `&session_token=${sessionToken}` : ''}`;
+  const response = await fetch(url);
+  if (!response.ok) return [];
+  const data = await response.json();
+  const suggestions: LocationSuggestion[] = Array.isArray(data.suggestions) ? data.suggestions.map((s: any, i: number) => {
+    // Map Mapbox feature types to our interface types
+    let mappedType: LocationSuggestion['type'] = 'place';
+    const featureType = s.feature_type || '';
 
-  return result;
+    switch (featureType) {
+      case 'address': mappedType = 'address'; break;
+      case 'poi': mappedType = 'poi'; break;
+      case 'locality': mappedType = 'locality'; break;
+      case 'neighborhood': mappedType = 'neighborhood'; break;
+      case 'region': mappedType = 'province'; break;
+      case 'postcode': mappedType = 'postcode'; break;
+      case 'district': mappedType = 'district'; break;
+      case 'country': mappedType = 'country'; break;
+      case 'place':
+      default:
+        mappedType = 'place';
+        break;
+    }
+
+    return {
+      name: s.name || s.feature_name || query,
+      fullName: s.place_formatted || s.name || query,
+      type: mappedType,
+      province: s.context?.find((c: any) => c.id.startsWith('region'))?.text,
+      district: s.context?.find((c: any) => c.id.startsWith('district'))?.text,
+      code: 100000 + i,
+      geocodeQuery: s.place_formatted || s.name || query,
+      mapboxId: s.mapbox_id || s.id
+    };
+  }) : [];
+
+  // CACHE DISABLED FOR TESTING - Not storing results
+  console.log(`Cache disabled - NOT storing ${suggestions.length} results for: ${query}`);
+
+  return suggestions;
 }
 
-// Generate cache key for geocoding with consistent format
-export function generateGeocodingKey(query: string): string {
-  return generateCacheKey('geocoding', { query: query.toLowerCase().trim() });
+export async function retrieveLocation(id: string, sessionToken?: string): Promise<GeocodingResult | null> {
+  const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+  if (!token) return null;
+  const base = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
+  const url = `${base}/${encodeURIComponent(id)}?access_token=${token}${sessionToken ? `&session_token=${sessionToken}` : ''}`;
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const data = await response.json();
+  const feature = data?.features?.[0] || data?.feature;
+  if (!feature?.geometry?.coordinates) return null;
+  const [lng, lat] = feature.geometry.coordinates;
+  return {
+    coordinates: [lng, lat],
+    placeName: feature.place_name || feature.name || '',
+    placeType: Array.isArray(feature.place_type) && feature.place_type.length > 0 ? feature.place_type[0] : (feature.feature_type || 'location'),
+    context: feature.text || feature.name || undefined
+  };
 }
 
-// Generate cache key for location suggestions
-export function generateLocationSuggestionsKey(
-  query: string,
-  options: {
-    limit?: number;
-    types?: string;
-    proximity?: string;
-    country?: string;
-    language?: string;
-  } = {}
-): string {
-  return generateCacheKey('locationSuggestions', {
-    query: query.toLowerCase().trim(),
-    limit: options.limit ?? 10,
-    types: options.types ?? 'address,place,poi,locality,neighborhood',
-    proximity: options.proximity,
-    country: options.country ?? 'VN',
-    language: options.language ?? 'vi'
+export async function searchCategory(poiCategoryCsv: string, params: { lat?: number; lng?: number; bbox?: string; limit?: number; country?: string; language?: string; proximity?: string; sessionToken?: string }): Promise<any[]> {
+  const token = process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN;
+  if (!token) return [];
+  const base = 'https://api.mapbox.com/search/searchbox/v1/category';
+  const limit = params.limit ?? 10;
+  const country = params.country ?? 'VN';
+  const language = params.language ?? 'vi';
+  const proximity = params.proximity ?? (params.lat != null && params.lng != null ? `${params.lng},${params.lat}` : undefined);
+  const bbox = params.bbox ? `&bbox=${params.bbox}` : '';
+  const sessionToken = params.sessionToken ? `&session_token=${params.sessionToken}` : '';
+  const proxParam = proximity ? `&proximity=${proximity}` : '';
+  const url = `${base}?poi_category=${encodeURIComponent(poiCategoryCsv)}&limit=${limit}&country=${country}&language=${language}${proxParam}${bbox}${sessionToken}&access_token=${token}`;
+  const response = await fetch(url);
+  if (!response.ok) return [];
+  const data = await response.json();
+  const pois = Array.isArray(data.suggestions) ? data.suggestions : (Array.isArray(data.features) ? data.features : []);
+  return pois.map((p: any) => {
+    const coords = p?.geometry?.coordinates || p?.coordinates;
+    const [lng, lat] = Array.isArray(coords) ? coords : [undefined, undefined];
+    return {
+      id: p.id || p.mapbox_id || p.external_ids?.[0] || `${p.name}-${lng}-${lat}`,
+      name: p.name || p.feature_name || p.place_name,
+      lat,
+      lng,
+      category: poiCategoryCsv,
+      place_type: p.place_type || p.feature_type,
+      address: p.place_formatted || p.address || p.place_name,
+    };
   });
 }
 
-// Calculate distance between two coordinates in meters
-export function calculateDistance(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
-  const R = 6371e3; // Earth's radius in meters
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+// Cached version using unified cache system
+export async function geocodeLocationCached(query: string): Promise<GeocodingResult | null> {
+  // Generate cache key for geocoding
+  const cacheKey = generateCacheKey('geocoding', query.toLowerCase().trim());
 
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) *
-    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  // CACHE DISABLED FOR TESTING - Always fetch fresh
+  console.log(`Cache disabled - fetching fresh geocoding for: ${query}`);
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c;
-}
-
-// Format coordinates consistently
-export function formatCoordinates(lat: number, lng: number, precision: number = 6): string {
-  return `${lat.toFixed(precision)},${lng.toFixed(precision)}`;
-}
-
-// Parse coordinate string
-export function parseCoordinates(coordString: string): [number, number] | null {
-  const parts = coordString.split(',').map(s => parseFloat(s.trim()));
-  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-    return [parts[1], parts[0]]; // Return as [lng, lat]
-  }
-  return null;
-}
-
-// Check if a point is within a given radius of another point
-export function isWithinRadius(
-  centerLat: number,
-  centerLng: number,
-  pointLat: number,
-  pointLng: number,
-  radiusMeters: number
-): boolean {
-  const distance = calculateDistance(centerLat, centerLng, pointLat, pointLng);
-  return distance <= radiusMeters;
-}
-
-// Bound coordinates to Vietnam's approximate bounds
-export function boundToVietnam(lat: number, lng: number): [number, number] {
-  // Vietnam approximate bounds
-  const MIN_LAT = 8.0;
-  const MAX_LAT = 23.5;
-  const MIN_LNG = 102.0;
-  const MAX_LNG = 110.0;
-
-  return [
-    Math.max(MIN_LNG, Math.min(MAX_LNG, lng)),
-    Math.max(MIN_LAT, Math.min(MAX_LAT, lat))
-  ];
-}
-
-// Generate a bounding box around a center point
-export function generateBoundingBox(
-  centerLat: number,
-  centerLng: number,
-  radiusKm: number
-): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
-  const latDelta = radiusKm / 111.32; // Approximate km per degree latitude
-  const lngDelta = radiusKm / (111.32 * Math.cos(centerLat * Math.PI / 180));
-
-  return {
-    minLat: centerLat - latDelta,
-    maxLat: centerLat + latDelta,
-    minLng: centerLng - lngDelta,
-    maxLng: centerLng + lngDelta
-  };
+  // Cache miss - call the main geocodeLocation function (which also caches)
+  return await geocodeLocation(query);
 }

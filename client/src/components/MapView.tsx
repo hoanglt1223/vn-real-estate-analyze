@@ -337,11 +337,11 @@ export default function MapView({
       // Performance optimizations
       antialias: false,
       fadeDuration: 0,
-      optimizeForTerrain: false,
+      // optimizeForTerrain: false, // Not available in MapOptions
       pitchWithRotate: false,
       renderWorldCopies: false,
       maxTileCacheSize: 10, // Reduced from default (depends on device)
-      localIdeographFontFamily: false, // Disable local fonts for better performance
+      localIdeographFontFamily: 'sans-serif', // Use system font instead
     });
 
     draw.current = new MapboxDraw({

@@ -166,13 +166,13 @@ class PrefetchService {
 
       // Prefetch amenities data
       if (categories && categories.length > 0) {
-        const amenitiesCacheKey = generateCacheKey('amenities', {
-          lat: lat.toFixed(4),
-          lng: lng.toFixed(4),
-          radius: prefetchRadius,
-          categories: categories.sort().join(','),
-          includeSmallShops: false
-        });
+        const amenitiesCacheKey = generateCacheKey('amenities',
+          lat.toFixed(4),
+          lng.toFixed(4),
+          prefetchRadius,
+          categories.sort().join(','),
+          'false'
+        );
 
         if (!cache.has(amenitiesCacheKey)) {
           console.log(`Prefetching amenities for ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
@@ -182,12 +182,12 @@ class PrefetchService {
 
       // Prefetch infrastructure data
       if (layers && layers.length > 0) {
-        const infrastructureCacheKey = generateCacheKey('infrastructure', {
-          lat: lat.toFixed(4),
-          lng: lng.toFixed(4),
-          radius: prefetchRadius,
-          layers: layers.sort().join(',')
-        });
+        const infrastructureCacheKey = generateCacheKey('infrastructure',
+          lat.toFixed(4),
+          lng.toFixed(4),
+          prefetchRadius,
+          layers.sort().join(',')
+        );
 
         if (!cache.has(infrastructureCacheKey)) {
           console.log(`Prefetching infrastructure for ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
@@ -196,11 +196,11 @@ class PrefetchService {
       }
 
       // Prefetch market data
-      const marketCacheKey = generateCacheKey('marketPrices', {
-        lat: lat.toFixed(4),
-        lng: lng.toFixed(4),
-        radius: prefetchRadius
-      });
+      const marketCacheKey = generateCacheKey('marketPrices',
+        lat.toFixed(4),
+        lng.toFixed(4),
+        prefetchRadius
+      );
 
       if (!cache.has(marketCacheKey)) {
         console.log(`Prefetching market data for ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
