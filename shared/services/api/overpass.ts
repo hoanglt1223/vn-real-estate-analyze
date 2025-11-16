@@ -202,11 +202,11 @@ export async function fetchAmenities(
   }
 
   console.log(`Cache miss for amenities: ${cacheKey}`);
-  const allAmenities: any[] = [];
 
-  for (const category of categories) {
+  // Process categories in parallel for better performance
+  const categoryPromises = categories.map(async (category) => {
     const query = AMENITY_QUERIES[category];
-    if (!query) continue;
+    if (!query) return [];
 
     // Try to get individual category from cache
     const categoryCacheKey = generateCacheKey('amenities', {
@@ -230,7 +230,7 @@ export async function fetchAmenities(
 
         if (!response.data) {
           console.log(`No data returned for ${category}`);
-          continue;
+          return [];
         }
 
         const data = response.data;
@@ -280,12 +280,16 @@ export async function fetchAmenities(
 
       } catch (error) {
         console.error(`Error fetching ${category} amenities:`, error);
-        continue;
+        return [];
       }
     }
 
-    allAmenities.push(...categoryAmenities);
-  }
+    return categoryAmenities;
+  });
+
+  // Wait for all category queries to complete
+  const categoryResults = await Promise.all(categoryPromises);
+  const allAmenities = categoryResults.flat();
 
   const sortedAmenities = allAmenities.sort((a, b) => a.distance - b.distance);
 
@@ -322,11 +326,11 @@ export async function fetchInfrastructure(
   }
 
   console.log(`Cache miss for infrastructure: ${cacheKey}`);
-  const infrastructure: any = {};
 
-  for (const layer of layers) {
+  // Process layers in parallel for better performance
+  const layerPromises = layers.map(async (layer) => {
     const queryConfig = INFRASTRUCTURE_QUERIES[layer as keyof typeof INFRASTRUCTURE_QUERIES];
-    if (!queryConfig) continue;
+    if (!queryConfig) return { layer, data: [] };
 
     // Try to get individual layer from cache
     const layerCacheKey = generateCacheKey('infrastructure', {
@@ -351,7 +355,7 @@ export async function fetchInfrastructure(
 
         const response = await overpassClient.query(overpassQuery);
 
-        if (!response.data) continue;
+        if (!response.data) return { layer, data: [] };
 
         const data = response.data;
 
@@ -380,11 +384,20 @@ export async function fetchInfrastructure(
 
       } catch (error) {
         console.error(`Error fetching ${layer} infrastructure:`, error);
-        continue;
+        return { layer, data: [] };
       }
     }
 
-    infrastructure[layer] = layerData;
+    return { layer, data: layerData };
+  });
+
+  // Wait for all layer queries to complete
+  const layerResults = await Promise.all(layerPromises);
+  const infrastructure: any = {};
+
+  // Convert results back to object format
+  for (const { layer, data } of layerResults) {
+    infrastructure[layer] = data;
   }
 
   // Cache the combined result

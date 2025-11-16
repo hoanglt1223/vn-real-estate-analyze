@@ -253,10 +253,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST' && action === 'analyze-property') {
       const input = analyzePropertySchema.parse(req.body);
       const metrics = calculatePropertyMetrics(input.coordinates);
-      const amenities = await fetchAmenities(metrics.center.lat, metrics.center.lng, input.radius, input.categories, input.includeSmallShops, input.maxAmenities);
-      const infrastructure = await fetchInfrastructure(metrics.center.lat, metrics.center.lng, input.radius, input.layers);
+
+      // Run independent API calls in parallel to improve performance
+      const [amenities, infrastructure, marketData] = await Promise.all([
+        fetchAmenities(metrics.center.lat, metrics.center.lng, input.radius, input.categories, input.includeSmallShops, input.maxAmenities),
+        fetchInfrastructure(metrics.center.lat, metrics.center.lng, input.radius, input.layers),
+        scrapeMarketPrices(metrics.center.lat, metrics.center.lng, input.radius)
+      ]);
+
+      // Risk assessment depends on infrastructure, so it runs after infrastructure is loaded
       const riskAssessment = assessRisks(metrics.center, infrastructure);
-      const marketData = await scrapeMarketPrices(metrics.center.lat, metrics.center.lng, input.radius);
+
+      // AI analysis depends on all previous data, so it runs last
       const aiAnalysis = await analyzeProperty({
         area: metrics.area,
         orientation: metrics.orientation,
@@ -266,6 +274,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         marketData,
         risks: riskAssessment.risks
       });
+
       const id = randomUUID();
       const analysis: PropertyAnalysis = {
         id,
