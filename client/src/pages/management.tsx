@@ -417,19 +417,19 @@ const currentProperties = getArray(isSearchMode ? searchResults : properties);
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <p className="text-muted-foreground">Diện tích</p>
-                            <p className="font-semibold">{property.area.toFixed(0)} m²</p>
+                            <p className="font-semibold">{getNumber(property.area).toFixed(0)} m²</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Hướng</p>
-                            <p className="font-semibold">{property.orientation}</p>
+                            <p className="font-semibold">{getString(property.orientation, 'Chưa xác định')}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Mặt tiền</p>
-                            <p className="font-semibold">{property.frontageCount} mặt</p>
+                            <p className="font-semibold">{getNumber(property.frontageCount)} mặt</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Tiện ích</p>
-                            <p className="font-semibold">{property.amenities?.length || 0}</p>
+                            <p className="font-semibold">{getArray(property.amenities).length}</p>
                           </div>
                         </div>
 

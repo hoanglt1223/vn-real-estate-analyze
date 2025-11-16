@@ -4,6 +4,7 @@ import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Brain, CheckCircle2, XCircle, AlertCircle, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
+import { getNumber } from '@/lib/typeSafety';
 
 interface AIScore {
   overall: number;
@@ -75,11 +76,12 @@ export default function AIAnalysisCard({
 
   const recommendationConfig = getRecommendationConfig();
 
-  const formatPrice = (price: number) => {
-    if (price >= 1000000000) {
-      return `${(price / 1000000000).toFixed(1)} tỷ VNĐ`;
+  const formatPrice = (price: any) => {
+    const safePrice = getNumber(price);
+    if (safePrice >= 1000000000) {
+      return `${(safePrice / 1000000000).toFixed(1)} tỷ VNĐ`;
     }
-    return `${(price / 1000000).toFixed(0)} triệu VNĐ`;
+    return `${(safePrice / 1000000).toFixed(0)} triệu VNĐ`;
   };
 
   return (

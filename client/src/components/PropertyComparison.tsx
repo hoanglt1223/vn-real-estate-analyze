@@ -217,7 +217,7 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
                   <div className="flex-1">
                     <h4 className="font-semibold">{property.propertyType || 'Chưa phân loại'}</h4>
                     <p className="text-sm text-muted-foreground">
-                      {property.area.toFixed(0)} m² • Hướng {property.orientation}
+                      {getNumber(property.area).toFixed(0)} m² • Hướng {getString(property.orientation, 'Chưa xác định')}
                     </p>
                     <div className="flex items-center gap-4 mt-1">
                       <span className={`text-sm font-medium ${getScoreColor(property.aiAnalysis?.scores?.overall || 0)}`}>
@@ -299,8 +299,8 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
                         return (
                           <TableCell key={data.propertyId} className="text-center">
                             <div className="flex items-center justify-center gap-2">
-                              {data.metrics.area.toFixed(0)}
-                              {getComparisonIcon(data.metrics.area, avgArea)}
+                              {getNumber(data.metrics.area).toFixed(0)}
+                              {getComparisonIcon(getNumber(data.metrics.area), getNumber(avgArea))}
                             </div>
                           </TableCell>
                         );
@@ -310,15 +310,15 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
                     <TableRow>
                       <TableCell className="font-medium">Giá/m²</TableCell>
                       {comparisonData.map((data) => {
-                        const avgPrice = comparisonData.reduce((acc, d) => acc + d.metrics.pricePerSqm, 0) / comparisonData.length;
+                        const avgPrice = comparisonData.reduce((acc, d) => acc + getNumber(d.metrics.pricePerSqm), 0) / comparisonData.length;
                         return (
                           <TableCell key={data.propertyId} className="text-center">
-                            {data.metrics.pricePerSqm > 0 ? (
+                            {getNumber(data.metrics.pricePerSqm) > 0 ? (
                               <div className="flex items-center justify-center gap-2">
                                 <span className="text-sm">
-                                  {(data.metrics.pricePerSqm / 1000000).toFixed(0)}M
+                                  {(getNumber(data.metrics.pricePerSqm) / 1000000).toFixed(0)}M
                                 </span>
-                                {getComparisonIcon(data.metrics.pricePerSqm, avgPrice)}
+                                {getComparisonIcon(getNumber(data.metrics.pricePerSqm), getNumber(avgPrice))}
                               </div>
                             ) : (
                               <span className="text-muted-foreground">-</span>
@@ -439,7 +439,7 @@ export default function PropertyComparison({ properties, onPropertySelect }: Pro
                           {largestProperty.propertyId !== bestProperty.propertyId && (
                             <p>
                               <strong>Lớn nhất:</strong> {largestProperty.property.propertyType}
-                              ({largestProperty.metrics.area.toFixed(0)} m²)
+                              ({getNumber(largestProperty.metrics.area).toFixed(0)} m²)
                             </p>
                           )}
                         </>

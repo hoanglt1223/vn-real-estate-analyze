@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { getNumber } from '@/lib/typeSafety';
 import { toPng } from 'html-to-image';
 
 interface PDFData {
@@ -63,7 +64,7 @@ export async function generatePDF(data: PDFData, options?: {
   yPos += 6;
   pdf.text(`Số mặt tiền: ${data.propertyData.frontageCount}`, margin, yPos);
   yPos += 6;
-  pdf.text(`Tọa độ: ${data.propertyData.center.lat.toFixed(6)}, ${data.propertyData.center.lng.toFixed(6)}`, margin, yPos);
+  pdf.text(`Tọa độ: ${getNumber(data.propertyData.center?.lat).toFixed(6)}, ${getNumber(data.propertyData.center?.lng).toFixed(6)}`, margin, yPos);
   yPos += 12;
 
   try {

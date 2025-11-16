@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { getNumber } from '@/lib/typeSafety';
 
 interface PriceData {
   min: number;
@@ -25,24 +26,26 @@ interface MarketPriceCardProps {
 export default function MarketPriceCard({ data }: MarketPriceCardProps) {
   if (!data) return null;
 
-  const formatPrice = (price: number) => {
-    if (price >= 1000000000) {
-      return `${(price / 1000000000).toFixed(1)} tỷ VND`;
+  const formatPrice = (price: any) => {
+    const safePrice = getNumber(price);
+    if (safePrice >= 1000000000) {
+      return `${(safePrice / 1000000000).toFixed(1)} tỷ VND`;
     }
-    return `${(price / 1000000).toFixed(0)} tr VND`;
+    return `${(safePrice / 1000000).toFixed(0)} tr VND`;
   };
 
-  const formatPricePerSqm = (price: number) => {
-    if (price >= 1000000) {
-      return `${(price / 1000000).toFixed(1)} tr/m²`;
+  const formatPricePerSqm = (price: any) => {
+    const safePrice = getNumber(price);
+    if (safePrice >= 1000000) {
+      return `${(safePrice / 1000000).toFixed(1)} tr/m²`;
     }
-    return `${(price / 1000).toFixed(0)}k/m²`;
+    return `${(safePrice / 1000).toFixed(0)}k/m²`;
   };
 
   const chartData = [
-    { name: 'Thấp nhất', value: data.min, color: 'hsl(var(--chart-1))' },
-    { name: 'Trung bình', value: data.avg, color: 'hsl(var(--chart-3))' },
-    { name: 'Cao nhất', value: data.max, color: 'hsl(var(--chart-2))' }
+    { name: 'Thấp nhất', value: getNumber(data.min), color: 'hsl(var(--chart-1))' },
+    { name: 'Trung bình', value: getNumber(data.avg), color: 'hsl(var(--chart-3))' },
+    { name: 'Cao nhất', value: getNumber(data.max), color: 'hsl(var(--chart-2))' }
   ];
 
   return (
@@ -83,12 +86,12 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
           </div>
         </div>
 
-        {data.pricePerSqm && (
+        {data.pricePerSqm != null && (
           <div className="p-3 rounded-lg bg-muted/50">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Giá trung bình/m²</span>
               <span className="text-lg font-bold text-primary" data-testid="text-price-per-sqm">
-                {formatPricePerSqm(data.pricePerSqm)}
+                {formatPricePerSqm(getNumber(data.pricePerSqm))}
               </span>
             </div>
           </div>
@@ -126,7 +129,7 @@ export default function MarketPriceCard({ data }: MarketPriceCardProps) {
         <div className="flex items-center justify-between pt-4 border-t">
           <span className="text-sm text-muted-foreground">Số tin đăng</span>
           <Badge variant="outline" data-testid="badge-listing-count">
-            {data.listingCount} tin
+            {getNumber(data.listingCount)} tin
           </Badge>
         </div>
 
